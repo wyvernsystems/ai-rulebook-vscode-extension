@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Tests**: `tests/safePaths.test.mjs`, `tests/manifest.test.mjs`, and
+  `tests/rulesOperations.test.mjs` cover path containment, manifest
+  validation, rule toggle/install/reset, global-mirror guards, and Cline
+  flattening (`npm test`).
+
 ## [1.4.0] - 2026-05-05
 
 ### Added
