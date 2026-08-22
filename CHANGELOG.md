@@ -26,6 +26,8 @@ All notable changes to this project are documented here. The format follows
 - **Rule pack compressed to one file.** `core.mdc` is always on and combines
   stable dependencies, reuse, feature organization, unit tests and coverage,
   project-document upkeep, and Markdown conventions.
+- **Core guidance made actionable.** Requirements now define applicability,
+  scoped changes, verification reporting, and baseline input and secret safety.
 - **Clean compilation.** `npm run compile` removes stale `out/` files before
   rebuilding so deleted modules cannot enter the VSIX.
 - **README simplified.** Setup, commands, rule location, and development steps

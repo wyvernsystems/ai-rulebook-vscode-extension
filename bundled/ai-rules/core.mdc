@@ -5,13 +5,13 @@ alwaysApply: true
 
 # Core
 
-- Prefer latest stable/LTS runtimes and maintained stable libraries.
-- Reuse existing code; avoid duplication; extract shared logic.
-- Organize code by feature.
-- Keep one purpose per folder.
-- Expose public APIs; avoid cross-feature deep imports.
-- Add/update unit tests; run coverage and report results.
-- Keep testable requirements in `REQUIREMENTS.md`.
-- Keep usage instructions in `README.md`.
+- Prefer supported LTS runtimes and maintained stable libraries; avoid prereleases.
+- Search for existing code before adding helpers; reuse or extract shared logic.
+- Organize code by feature; keep one cohesive responsibility per folder.
+- Access other features through public APIs; avoid cross-feature deep imports.
+- Keep changes scoped; avoid unrelated edits.
+- For behavior changes, add/update unit tests; run relevant tests and coverage; report failures or omissions.
+- Update `REQUIREMENTS.md` for testable behavior and `README.md` for usage or configuration.
 - Record release-worthy changes under `CHANGELOG.md`’s `[Unreleased]`.
+- Never expose secrets; validate external input; preserve errors with context.
 - Markdown: one H1; unskipped headings; `-` lists; tagged fences; inline-code paths/commands; relative internal links.
