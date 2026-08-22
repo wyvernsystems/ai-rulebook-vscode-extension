@@ -8,6 +8,9 @@ details belong in the code or in the rule files.
 
 - The extension installs one always-on `core.mdc` into
   `.cursor/rules/ai-rules/` of the open workspace.
+- Before writing Cursor or Cline rules, the extension idempotently adds
+  `/.cursor/rules/ai-rules/` and `/.clinerules/ai-rules/` to the workspace
+  `.gitignore`, creating the file when absent.
 - On activation (and on `onDidChangeWorkspaceFolders`), if the workspace has
   no `.cursor/rules/ai-rules/` folder yet, the extension installs the bundled
   core rule automatically. Existing rules folders are never overwritten by
@@ -18,8 +21,7 @@ details belong in the code or in the rule files.
   - `"auto"` (default): create the folder only when the host application is
     Cursor. Detected via `vscode.env.uriScheme === "cursor"` or
     `vscode.env.appName` containing `"cursor"` (case-insensitive).
-  - `"always"`: create the folder regardless of host (useful when committing
-    rules for Cursor-using teammates while editing in plain VS Code).
+  - `"always"`: create the folder regardless of host.
   - `"never"`: never auto-install. Manual install / reset / sidebar
     commands still work.
 - When the resolved policy skips the auto-install, the extension shows a

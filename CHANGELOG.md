@@ -11,6 +11,9 @@ All notable changes to this project are documented here. The format follows
 - **Tests**: `tests/safePaths.test.mjs`, `tests/manifest.test.mjs`, and
   `tests/rulesOperations.test.mjs` cover path containment, manifest
   validation, core-rule toggle/install/reset, and Cline mirroring (`npm test`).
+- **Generated rule folders stay local.** Install and Cline sync add
+  `/.cursor/rules/ai-rules/` and `/.clinerules/ai-rules/` to the workspace
+  `.gitignore`.
 
 ### Changed
 
@@ -25,6 +28,8 @@ All notable changes to this project are documented here. The format follows
   project-document upkeep, and Markdown conventions.
 - **Clean compilation.** `npm run compile` removes stale `out/` files before
   rebuilding so deleted modules cannot enter the VSIX.
+- **README simplified.** Setup, commands, rule location, and development steps
+  now fit in a short quick-reference guide.
 
 ### Removed
 

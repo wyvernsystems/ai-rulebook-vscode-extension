@@ -9,11 +9,53 @@ import {
 
 const RULES_SUBDIR = "ai-rules";
 export const CORE_RULE_FILE = "core.mdc";
+export const GENERATED_RULE_IGNORE_ENTRIES = [
+  "/.cursor/rules/ai-rules/",
+  "/.clinerules/ai-rules/",
+] as const;
 
 const RULES_DIR_SEGMENTS = [".cursor", "rules", RULES_SUBDIR] as const;
 
 export function workspaceRulesDir(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".cursor", "rules", RULES_SUBDIR);
+}
+
+function normalizeIgnoreEntry(entry: string): string {
+  return entry.trim().replace(/^\//, "").replace(/\/+$/, "");
+}
+
+/** Keeps generated Cursor and Cline rule folders out of source control. */
+export async function ensureAiRulesIgnored(workspaceRoot: string): Promise<void> {
+  const gitignorePath = path.join(workspaceRoot, ".gitignore");
+  let existing = "";
+  try {
+    existing = await fs.readFile(gitignorePath, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw new Error(`Unable to read ${gitignorePath}: ${String(error)}`);
+    }
+  }
+
+  const ignored = new Set(
+    existing
+      .split(/\r?\n/)
+      .filter((line) => line.trim() && !line.trim().startsWith("#"))
+      .map(normalizeIgnoreEntry)
+  );
+  const missing = GENERATED_RULE_IGNORE_ENTRIES.filter(
+    (entry) => !ignored.has(normalizeIgnoreEntry(entry))
+  );
+  if (missing.length === 0) {
+    return;
+  }
+
+  const newline = existing.includes("\r\n") ? "\r\n" : "\n";
+  const separator = existing.length > 0 && !existing.endsWith("\n") ? newline : "";
+  await fs.writeFile(
+    gitignorePath,
+    `${existing}${separator}${missing.join(newline)}${newline}`,
+    "utf8"
+  );
 }
 
 export async function pathExists(p: string): Promise<boolean> {
@@ -126,6 +168,7 @@ export async function syncBundledMdcsToClinerules(
   workspaceRoot: string,
   bundleDir: string
 ): Promise<void> {
+  await ensureAiRulesIgnored(workspaceRoot);
   const dest = path.join(workspaceRoot, ".clinerules", RULES_SUBDIR);
   await fs.mkdir(dest, { recursive: true });
   const srcPath = await bundledCoreRulePath(bundleDir);

@@ -13,6 +13,7 @@ import {
 } from "./ruleStatusUi";
 import {
   CORE_RULE_FILE,
+  ensureAiRulesIgnored,
   installCoreRule,
   pathExists,
   resetRulesDirToBundle,
@@ -192,6 +193,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     const rulesDir = workspaceRulesDir(root);
     if (await pathExists(rulesDir)) {
+      await ensureAiRulesIgnored(root);
       return;
     }
     if (!(await pathExists(bundleDir))) {
@@ -217,6 +219,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       return;
     }
 
+    await ensureAiRulesIgnored(root);
     await installCoreRule(bundleDir, rulesDir);
     const parts = [
       "AI Rulebook: installed the core rule into `.cursor/rules/ai-rules/`.",
@@ -255,6 +258,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!(await pathExists(bundleDir))) {
       throw new Error(`Missing bundle at ${bundleDir}`);
     }
+    await ensureAiRulesIgnored(root);
     await installCoreRule(bundleDir, rulesDir);
     const parts = ["AI Rulebook: installed the core rule into `.cursor/rules/ai-rules/`."];
     if (getAiRulesBoolean("autoSyncClineWhenInstalled", true) && isClineInstalled()) {
@@ -400,6 +404,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (choice !== "Reset to defaults") {
       return;
     }
+    await ensureAiRulesIgnored(root);
     await resetRulesDirToBundle(bundleDir, workspaceRulesDir(root));
     const clineSynced = await maybeAutoSyncCline(root);
     vscode.window.showInformationMessage(

@@ -5,6 +5,8 @@ import * as path from "node:path";
 import test, { describe } from "node:test";
 
 import {
+  ensureAiRulesIgnored,
+  GENERATED_RULE_IGNORE_ENTRIES,
   installCoreRule,
   isRuleEnabled,
   pathExists,
@@ -47,6 +49,50 @@ describe("path helpers", () => {
       assert.equal(await pathExists(file), true);
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ensureAiRulesIgnored", () => {
+  test("creates .gitignore with Cursor and Cline rule folders", async () => {
+    const root = await makeTempRoot("airules-ignore-new-");
+    try {
+      await ensureAiRulesIgnored(root);
+
+      const gitignore = await fs.readFile(path.join(root, ".gitignore"), "utf8");
+      assert.equal(gitignore, `${GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("appends missing entries without changing existing content", async () => {
+    const root = await makeTempRoot("airules-ignore-existing-");
+    try {
+      await writeFile(path.join(root, ".gitignore"), "node_modules/");
+      await ensureAiRulesIgnored(root);
+
+      const gitignore = await fs.readFile(path.join(root, ".gitignore"), "utf8");
+      assert.equal(
+        gitignore,
+        `node_modules/\n${GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("recognizes equivalent entries and remains idempotent", async () => {
+    const root = await makeTempRoot("airules-ignore-idempotent-");
+    const initial = ".cursor/rules/ai-rules\n/.clinerules/ai-rules/\n";
+    try {
+      await writeFile(path.join(root, ".gitignore"), initial);
+      await ensureAiRulesIgnored(root);
+      await ensureAiRulesIgnored(root);
+
+      assert.equal(await fs.readFile(path.join(root, ".gitignore"), "utf8"), initial);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
     }
   });
 });
@@ -198,6 +244,8 @@ describe("syncBundledMdcsToClinerules", () => {
       const dest = path.join(workspace, ".clinerules", "ai-rules");
       const coreMirror = path.join(dest, "ai-rules-core.md");
       assert.equal(await fs.readFile(coreMirror, "utf8"), "core\n");
+      const gitignore = await fs.readFile(path.join(workspace, ".gitignore"), "utf8");
+      assert.equal(gitignore, `${GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`);
     } finally {
       await fs.rm(bundle, { recursive: true, force: true });
       await fs.rm(workspace, { recursive: true, force: true });

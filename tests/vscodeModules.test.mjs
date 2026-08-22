@@ -435,8 +435,32 @@ describe("extension activation", () => {
       "core.mdc"
     );
     assert.equal(await rulesOperations.pathExists(installedCore), true);
+    assert.equal(
+      await fs.readFile(path.join(workspaceRoot, ".gitignore"), "utf8"),
+      `${rulesOperations.GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`
+    );
     assert.ok(state.informationMessages.some((message) => /installed the core rule/.test(message)));
     assert.ok(state.outputChannels[0].lines.some((line) => line === "active\tcore.mdc"));
+  });
+
+  test("activate adds ignore entries when core.mdc already exists", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    vscode.env.uriScheme = "cursor";
+    vscode.env.appName = "Cursor";
+    await writeFile(
+      path.join(rulesOperations.workspaceRulesDir(workspaceRoot), "core.mdc"),
+      "existing\n"
+    );
+    const { context } = makeExtensionContext(repoRoot);
+
+    await extension.activate(context);
+
+    assert.equal(
+      await fs.readFile(path.join(workspaceRoot, ".gitignore"), "utf8"),
+      `${rulesOperations.GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`
+    );
   });
 
   test("activate mirrors to Cline without creating Cursor rules on a non-Cursor host", async (t) => {
@@ -457,6 +481,10 @@ describe("extension activation", () => {
         path.join(workspaceRoot, ".clinerules", "ai-rules", "ai-rules-core.md")
       ),
       true
+    );
+    assert.equal(
+      await fs.readFile(path.join(workspaceRoot, ".gitignore"), "utf8"),
+      `${rulesOperations.GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`
     );
     assert.equal(values.get("aiRules.nonCursorHostNoticeShown"), true);
   });
