@@ -1,6 +1,11 @@
 {
   "version": 1,
   "files": [
-    "core.mdc"
+    "code.mdc",
+    "docs.mdc",
+    "git.mdc",
+    "markdown.mdc",
+    "scope.mdc",
+    "tests.mdc"
   ]
 }

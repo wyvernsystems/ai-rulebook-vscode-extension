@@ -1,8 +1,8 @@
 {
   "name": "ai-rulebook",
   "displayName": "AI Rulebook",
-  "description": "AI Rulebook — install and manage one compact, always-on engineering rule for Cursor, with optional Cline sync.",
-  "version": "1.4.0",
+  "description": "AI Rulebook — install and manage focused, always-on engineering rules for Cursor, with optional Cline sync.",
+  "version": "2.0.0",
   "publisher": "WyvernSystemsLLC",
   "license": "MIT",
   "icon": "icon.png",
@@ -42,27 +42,37 @@
     "commands": [
       {
         "command": "aiRules.installWorkspace",
-        "title": "AI Rulebook: Install / update core rule",
+        "title": "AI Rulebook: Install / update rule pack",
         "category": "AI Rulebook"
       },
       {
         "command": "aiRules.enableCoreWorkspace",
-        "title": "AI Rulebook: Enable core rule (workspace)",
+        "title": "AI Rulebook: Enable all rules (workspace)",
         "category": "AI Rulebook"
       },
       {
         "command": "aiRules.disableCoreWorkspace",
-        "title": "AI Rulebook: Disable core rule (workspace)",
+        "title": "AI Rulebook: Disable all rules (workspace)",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.enableRuleWorkspace",
+        "title": "AI Rulebook: Enable one rule…",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.disableRuleWorkspace",
+        "title": "AI Rulebook: Disable one rule…",
         "category": "AI Rulebook"
       },
       {
         "command": "aiRules.syncClineWorkspace",
-        "title": "AI Rulebook: Sync core rule to Cline",
+        "title": "AI Rulebook: Sync rule pack to Cline",
         "category": "AI Rulebook"
       },
       {
         "command": "aiRules.showCoreStatus",
-        "title": "AI Rulebook: Show core rule status",
+        "title": "AI Rulebook: Show rule pack status",
         "category": "AI Rulebook"
       },
       {
@@ -72,7 +82,7 @@
       },
       {
         "command": "aiRules.resetWorkspaceRulesToDefaults",
-        "title": "AI Rulebook: Reset core rule to default…",
+        "title": "AI Rulebook: Reset rule pack to defaults…",
         "category": "AI Rulebook"
       },
       {
@@ -100,7 +110,7 @@
       "aiRulesSidebar": [
         {
           "id": "aiRules.rulesTree",
-          "name": "Core Rule",
+          "name": "Rule Pack",
           "icon": "$(checklist)",
           "contextualTitle": "AI Rulebook"
         }
@@ -148,14 +158,14 @@
     "viewsWelcome": [
       {
         "view": "aiRules.rulesTree",
-        "contents": "Open a project folder to install and manage its core AI rule.\n[Open Folder](command:workbench.action.files.openFolder)",
+        "contents": "Open a project folder to install and manage its AI rule pack.\n[Open Folder](command:workbench.action.files.openFolder)",
         "when": "workspaceFolderCount == 0"
       }
     ],
     "colors": [
       {
         "id": "aiRulebook.activeForeground",
-        "description": "Foreground color for the enabled core rule.",
+        "description": "Foreground color for enabled rules.",
         "defaults": {
           "dark": "#3FB950",
           "light": "#1A7F37",
@@ -164,7 +174,7 @@
       },
       {
         "id": "aiRulebook.inactiveForeground",
-        "description": "Foreground color for the disabled core rule.",
+        "description": "Foreground color for disabled rules.",
         "defaults": {
           "dark": "#8B949E",
           "light": "#656D76",
@@ -178,7 +188,7 @@
         "aiRules.autoInstallOnOpenWorkspace": {
           "type": "boolean",
           "default": true,
-          "description": "When opening a workspace that has no .cursor/rules/ai-rules folder yet, install the bundled core rule automatically. Existing rules folders are never overwritten."
+          "description": "When opening a workspace that has no .cursor/rules/ai-rules folder yet, install the bundled rule pack automatically. Existing rules folders are never overwritten."
         },
         "aiRules.installCursorRulesFolder": {
           "type": "string",
@@ -208,7 +218,7 @@
         "aiRules.autoSyncClineWhenInstalled": {
           "type": "boolean",
           "default": true,
-          "description": "When Cline is installed, automatically mirror core.mdc into .clinerules/ai-rules/ after install or reset and when Cline is first detected."
+          "description": "When Cline is installed, automatically mirror the rule pack into .clinerules/ai-rules/ after install or reset and when Cline is first detected."
         }
       }
     }

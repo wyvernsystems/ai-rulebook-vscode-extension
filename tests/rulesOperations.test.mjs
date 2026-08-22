@@ -7,7 +7,7 @@ import test, { describe } from "node:test";
 import {
   ensureAiRulesIgnored,
   GENERATED_RULE_IGNORE_ENTRIES,
-  installCoreRule,
+  installRulePack,
   isRuleEnabled,
   pathExists,
   resetRulesDirToBundle,
@@ -16,7 +16,15 @@ import {
   workspaceRulesDir,
 } from "../out/rulesOperations.js";
 
-const CORE = "core.mdc";
+const RULE_FILES = [
+  "code.mdc",
+  "docs.mdc",
+  "git.mdc",
+  "markdown.mdc",
+  "scope.mdc",
+  "tests.mdc",
+];
+const SAMPLE_RULE = RULE_FILES[0];
 
 async function makeTempRoot(prefix) {
   return fs.mkdtemp(path.join(os.tmpdir(), prefix));
@@ -29,7 +37,9 @@ async function writeFile(abs, contents = "stub\n") {
 
 async function makeMiniBundle() {
   const dir = await makeTempRoot("airules-bundle-");
-  await writeFile(path.join(dir, CORE), "core\n");
+  await Promise.all(
+    RULE_FILES.map((ruleFile) => writeFile(path.join(dir, ruleFile), `${ruleFile}\n`))
+  );
   return dir;
 }
 
@@ -101,19 +111,19 @@ describe("setRuleEnabled / isRuleEnabled", () => {
   test("rename toggles .mdc ↔ .mdc.disabled and is a no-op when already in that state", async () => {
     const dir = await makeTempRoot("airules-toggle-");
     try {
-      await writeFile(path.join(dir, CORE), "core\n");
-      assert.equal(await isRuleEnabled(dir, CORE), true);
+      await writeFile(path.join(dir, SAMPLE_RULE), "code\n");
+      assert.equal(await isRuleEnabled(dir, SAMPLE_RULE), true);
 
-      await setRuleEnabled(dir, CORE, false);
-      assert.equal(await isRuleEnabled(dir, CORE), false);
-      assert.equal(await pathExists(path.join(dir, `${CORE}.disabled`)), true);
+      await setRuleEnabled(dir, SAMPLE_RULE, false);
+      assert.equal(await isRuleEnabled(dir, SAMPLE_RULE), false);
+      assert.equal(await pathExists(path.join(dir, `${SAMPLE_RULE}.disabled`)), true);
 
-      await setRuleEnabled(dir, CORE, false);
-      assert.equal(await isRuleEnabled(dir, CORE), false);
+      await setRuleEnabled(dir, SAMPLE_RULE, false);
+      assert.equal(await isRuleEnabled(dir, SAMPLE_RULE), false);
 
-      await setRuleEnabled(dir, CORE, true);
-      assert.equal(await isRuleEnabled(dir, CORE), true);
-      assert.equal(await pathExists(path.join(dir, `${CORE}.disabled`)), false);
+      await setRuleEnabled(dir, SAMPLE_RULE, true);
+      assert.equal(await isRuleEnabled(dir, SAMPLE_RULE), true);
+      assert.equal(await pathExists(path.join(dir, `${SAMPLE_RULE}.disabled`)), false);
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
@@ -122,11 +132,11 @@ describe("setRuleEnabled / isRuleEnabled", () => {
   test("enabling when both active and disabled exist drops the disabled copy", async () => {
     const dir = await makeTempRoot("airules-both-");
     try {
-      await writeFile(path.join(dir, CORE), "active\n");
-      await writeFile(path.join(dir, `${CORE}.disabled`), "off\n");
-      await setRuleEnabled(dir, CORE, true);
-      assert.equal(await isRuleEnabled(dir, CORE), true);
-      assert.equal(await pathExists(path.join(dir, `${CORE}.disabled`)), false);
+      await writeFile(path.join(dir, SAMPLE_RULE), "active\n");
+      await writeFile(path.join(dir, `${SAMPLE_RULE}.disabled`), "off\n");
+      await setRuleEnabled(dir, SAMPLE_RULE, true);
+      assert.equal(await isRuleEnabled(dir, SAMPLE_RULE), true);
+      assert.equal(await pathExists(path.join(dir, `${SAMPLE_RULE}.disabled`)), false);
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
@@ -144,14 +154,16 @@ describe("setRuleEnabled / isRuleEnabled", () => {
 
 });
 
-describe("installCoreRule", () => {
-  test("installs core.mdc and preserves unrelated workspace files", async () => {
+describe("installRulePack", () => {
+  test("installs every rule and preserves unrelated workspace files", async () => {
     const bundle = await makeMiniBundle();
     const rules = await makeTempRoot("airules-install-");
     try {
       await writeFile(path.join(rules, "user-extra.mdc"), "keep me\n");
-      await installCoreRule(bundle, rules);
-      assert.equal(await isRuleEnabled(rules, CORE), true);
+      await installRulePack(bundle, rules, RULE_FILES);
+      for (const ruleFile of RULE_FILES) {
+        assert.equal(await isRuleEnabled(rules, ruleFile), true);
+      }
       assert.equal(await pathExists(path.join(rules, "user-extra.mdc")), true);
     } finally {
       await fs.rm(bundle, { recursive: true, force: true });
@@ -159,28 +171,36 @@ describe("installCoreRule", () => {
     }
   });
 
-  test("removes a stale disabled core before installing", async () => {
+  test("removes stale disabled and legacy core rules before installing", async () => {
     const bundle = await makeMiniBundle();
     const rules = await makeTempRoot("airules-active-converge-");
     try {
-      await writeFile(path.join(rules, `${CORE}.disabled`), "stale disabled\n");
+      await writeFile(path.join(rules, `${SAMPLE_RULE}.disabled`), "stale disabled\n");
+      await writeFile(path.join(rules, "core.mdc"), "legacy\n");
 
-      await installCoreRule(bundle, rules);
+      await installRulePack(bundle, rules, RULE_FILES);
 
-      assert.equal(await isRuleEnabled(rules, CORE), true);
-      assert.equal(await pathExists(path.join(rules, `${CORE}.disabled`)), false);
-      assert.equal(await fs.readFile(path.join(rules, CORE), "utf8"), "core\n");
+      assert.equal(await isRuleEnabled(rules, SAMPLE_RULE), true);
+      assert.equal(await pathExists(path.join(rules, `${SAMPLE_RULE}.disabled`)), false);
+      assert.equal(await pathExists(path.join(rules, "core.mdc")), false);
+      assert.equal(
+        await fs.readFile(path.join(rules, SAMPLE_RULE), "utf8"),
+        `${SAMPLE_RULE}\n`
+      );
     } finally {
       await fs.rm(bundle, { recursive: true, force: true });
       await fs.rm(rules, { recursive: true, force: true });
     }
   });
 
-  test("throws when core.mdc is missing from the bundle", async () => {
+  test("throws when a listed rule is missing from the bundle", async () => {
     const bundle = await makeTempRoot("airules-missing-");
     const rules = await makeTempRoot("airules-missing-dest-");
     try {
-      await assert.rejects(() => installCoreRule(bundle, rules), /Bundled core rule missing/);
+      await assert.rejects(
+        () => installRulePack(bundle, rules, RULE_FILES),
+        /Bundled rule missing: .*\.mdc/
+      );
     } finally {
       await fs.rm(bundle, { recursive: true, force: true });
       await fs.rm(rules, { recursive: true, force: true });
@@ -211,7 +231,7 @@ describe("resetRulesDirToBundle", () => {
       await writeFile(path.join(rules, "orphan.mdc"), "gone\n");
       await resetRulesDirToBundle(bundle, rules);
       assert.equal(await pathExists(path.join(rules, "orphan.mdc")), false);
-      assert.equal(await isRuleEnabled(rules, CORE), true);
+      assert.equal(await isRuleEnabled(rules, SAMPLE_RULE), true);
     } finally {
       await fs.rm(bundle, { recursive: true, force: true });
       await fs.rm(root, { recursive: true, force: true });
@@ -236,14 +256,18 @@ describe("resetRulesDirToBundle", () => {
 });
 
 describe("syncBundledMdcsToClinerules", () => {
-  test("mirrors only core.mdc as ai-rules-core.md", async () => {
+  test("mirrors every topic rule and removes the legacy core mirror", async () => {
     const bundle = await makeMiniBundle();
     const workspace = await makeTempRoot("airules-cline-");
     try {
-      await syncBundledMdcsToClinerules(workspace, bundle);
       const dest = path.join(workspace, ".clinerules", "ai-rules");
-      const coreMirror = path.join(dest, "ai-rules-core.md");
-      assert.equal(await fs.readFile(coreMirror, "utf8"), "core\n");
+      await writeFile(path.join(dest, "ai-rules-core.md"), "legacy\n");
+      await syncBundledMdcsToClinerules(workspace, bundle, RULE_FILES);
+      for (const ruleFile of RULE_FILES) {
+        const mirror = path.join(dest, `ai-rules-${ruleFile.replace(".mdc", ".md")}`);
+        assert.equal(await fs.readFile(mirror, "utf8"), `${ruleFile}\n`);
+      }
+      assert.equal(await pathExists(path.join(dest, "ai-rules-core.md")), false);
       const gitignore = await fs.readFile(path.join(workspace, ".gitignore"), "utf8");
       assert.equal(gitignore, `${GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`);
     } finally {

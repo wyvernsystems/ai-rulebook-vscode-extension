@@ -1,0 +1,10 @@
+---
+description: Task scope and convention constraints
+alwaysApply: true
+---
+
+# Scope
+
+- Change only what the task requires. No drive-by refactors, renames, reformatting, or version bumps.
+- Match the conventions of the file you're editing, even where they conflict with the rules below.
+- If a rule here implies work outside the task, state it and move on — don't act on it.

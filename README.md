@@ -1,22 +1,24 @@
 # AI Rulebook
 
-AI Rulebook installs one compact, always-on engineering rule for Cursor, with
-optional Cline support.
+AI Rulebook installs a focused set of always-on engineering rules for Cursor,
+with optional Cline support.
 
-The rule asks AI agents to:
+The rules ask AI agents to:
 
-- prefer stable LTS tools and libraries;
-- reuse code and organize by feature;
-- add unit tests and report coverage;
-- maintain `README.md`, `REQUIREMENTS.md`, and `CHANGELOG.md`;
-- use consistent Markdown.
+- keep changes within the requested scope;
+- reuse code, organize by feature, and handle inputs and errors safely;
+- add unit tests and report every failing or unrun check;
+- update project documentation only when its trigger applies;
+- use consistent Markdown and avoid unrequested Git mutations.
 
 ## Use
 
 1. Install **AI Rulebook**.
 2. Open a project in Cursor.
-3. The extension installs `.cursor/rules/ai-rules/core.mdc`.
-4. Use the **AI Rulebook** sidebar checkbox to enable or disable it.
+3. The extension installs six topic rules under `.cursor/rules/ai-rules/`.
+   Every rule is enabled and marked `alwaysApply: true` by default.
+4. Use the **AI Rulebook** sidebar checkboxes or commands to change their
+   enabled state.
 
 The generated Cursor and Cline rule folders are automatically added to the
 project's `.gitignore`, so using the extension remains optional for each
@@ -27,23 +29,31 @@ To disable automatic installation, set
 
 ## Commands
 
-Open the command palette and search for **AI Rulebook** to:
+Open the command palette and search for **AI Rulebook**. Rule-state commands
+include:
 
-- install, update, enable, disable, or reset the core rule;
-- open the rule or show its status;
-- sync the rule to Cline;
-- show or hide rule colors.
+- **Enable one rule…** and **Disable one rule…** select an individual topic.
+- **Enable all rules (workspace)** and **Disable all rules (workspace)** change
+  the complete pack together.
+
+Additional commands install, update, or reset the pack; open rules or show pack
+status; sync to Cline; and show or hide rule colors.
 
 ## Rule files
 
-The editable source is:
+The editable source contains one file per topic:
 
 ```text
-.cursor/rules/ai-rules/core.mdc
+.cursor/rules/ai-rules/
+├── code.mdc
+├── docs.mdc
+├── git.mdc
+├── markdown.mdc
+├── scope.mdc
+└── tests.mdc
 ```
 
-The extension packages a synchronized copy at
-`bundled/ai-rules/core.mdc`.
+The extension packages synchronized copies under `bundled/ai-rules/`.
 
 ## Development
 
@@ -53,7 +63,7 @@ npm test
 npm run package
 ```
 
-Run `npm run sync-bundled` after editing `core.mdc`.
+Run `npm run sync-bundled` after editing the source rule files.
 
 ## License
 

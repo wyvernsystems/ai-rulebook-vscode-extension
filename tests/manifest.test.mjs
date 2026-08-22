@@ -9,6 +9,14 @@ import { readBundleManifest } from "../out/manifest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
+const RULE_FILES = [
+  "code.mdc",
+  "docs.mdc",
+  "git.mdc",
+  "markdown.mdc",
+  "scope.mdc",
+  "tests.mdc",
+];
 
 async function writeExtensionRoot(manifest) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "airules-manifest-"));
@@ -18,19 +26,22 @@ async function writeExtensionRoot(manifest) {
 }
 
 describe("readBundleManifest (shipped pack)", () => {
-  test("loads the single-core bundled manifest", () => {
+  test("loads the topic-based bundled manifest", () => {
     const manifest = readBundleManifest(repoRoot);
     assert.equal(manifest.version, 1);
-    assert.deepEqual(manifest.files, ["core.mdc"]);
+    assert.deepEqual(manifest.files, RULE_FILES);
   });
 
-  test("ships the core rule as always-on", async () => {
-    const core = await fs.readFile(
-      path.join(repoRoot, "bundled", "ai-rules", "core.mdc"),
-      "utf8"
+  test("ships every topic rule as always-on", async () => {
+    const rules = await Promise.all(
+      RULE_FILES.map((ruleFile) =>
+        fs.readFile(path.join(repoRoot, "bundled", "ai-rules", ruleFile), "utf8")
+      )
     );
 
-    assert.match(core, /^---\n(?:[^\n]*\n)*alwaysApply: true\n(?:[^\n]*\n)*---\n/);
+    for (const rule of rules) {
+      assert.match(rule, /^---\n(?:[^\n]*\n)*alwaysApply: true\n(?:[^\n]*\n)*---\n/);
+    }
   });
 });
 

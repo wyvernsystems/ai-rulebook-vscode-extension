@@ -9,12 +9,11 @@ import {
 import { readBundleManifest, type BundleManifest } from "./manifest";
 import {
   createAiRulesOutputChannel,
-  showCoreStatusInOutput,
+  showRulePackStatusInOutput,
 } from "./ruleStatusUi";
 import {
-  CORE_RULE_FILE,
   ensureAiRulesIgnored,
-  installCoreRule,
+  installRulePack,
   pathExists,
   resetRulesDirToBundle,
   setRuleEnabled,
@@ -50,18 +49,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
     vscode.window.showErrorMessage(
-      `AI Rulebook: failed to load core rule — ${reason}. Reinstall the extension or rebuild the bundle.`
+      `AI Rulebook: failed to load rule pack — ${reason}. Reinstall the extension or rebuild the bundle.`
     );
     return;
   }
 
-  if (manifest.files.length !== 1 || manifest.files[0] !== CORE_RULE_FILE) {
+  if (manifest.files.length === 0 || manifest.files.some((file) => !file.endsWith(".mdc"))) {
     vscode.window.showErrorMessage(
-      "AI Rulebook: bundled manifest must contain only core.mdc. Reinstall the extension or rebuild the bundle."
+      "AI Rulebook: bundled manifest must contain at least one .mdc rule and no other files. Reinstall the extension or rebuild the bundle."
     );
     return;
   }
-  const mdcs = [CORE_RULE_FILE];
+  const mdcs = manifest.files;
   const rulesOutput = createAiRulesOutputChannel();
   context.subscriptions.push(rulesOutput);
 
@@ -77,7 +76,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     })
   );
 
-  const treeProvider = new RulesTreeProvider();
+  const treeProvider = new RulesTreeProvider(mdcs);
   treeProvider.onAfterRefresh(() => sidebarColors.refresh());
   treeProvider.onAfterRefresh(() => explorerColors.refresh());
   /**
@@ -107,7 +106,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!isClineInstalled()) {
       return false;
     }
-    await syncBundledMdcsToClinerules(root, bundleDir);
+    await syncBundledMdcsToClinerules(root, bundleDir, mdcs);
     return true;
   };
 
@@ -118,9 +117,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (now && !clineWasInstalled && getAiRulesBoolean("autoSyncClineWhenInstalled", true)) {
         const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (root) {
-          void syncBundledMdcsToClinerules(root, bundleDir).then(() => {
+          void syncBundledMdcsToClinerules(root, bundleDir, mdcs).then(() => {
             vscode.window.showInformationMessage(
-              "AI Rulebook: Cline detected—synced core rule to `.clinerules/ai-rules/`."
+              "AI Rulebook: Cline detected—synced the rule pack to `.clinerules/ai-rules/`."
             );
           });
         }
@@ -150,7 +149,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await context.globalState.update(NON_CURSOR_NOTICE_KEY, true);
     const pick = await vscode.window.showInformationMessage(
       `AI Rulebook: detected ${vscode.env.appName} (not Cursor). Skipping the .cursor/rules/ai-rules/ auto-install. ` +
-        `Run "AI Rulebook: Install / update core rule" if you want it anyway, or set ` +
+        `Run "AI Rulebook: Install / update rule pack" if you want it anyway, or set ` +
         `"aiRules.installCursorRulesFolder" to "always" to disable this check.`,
       "Install now",
       "Open setting",
@@ -168,7 +167,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   /**
    * Idempotent first-time install: if the workspace has no
-   * `.cursor/rules/ai-rules` folder yet, install the bundled core rule.
+   * `.cursor/rules/ai-rules` folder yet, install the bundled rule pack.
    * Existing rules folders are left untouched so the user never gets a
    * surprise overwrite—use "Install / update" or "Reset" for that.
    *
@@ -207,9 +206,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!writeCursorRules) {
       // Cline still mirrors independently; only skip the .cursor/ install.
       if (wantCline) {
-        await syncBundledMdcsToClinerules(root, bundleDir);
+        await syncBundledMdcsToClinerules(root, bundleDir, mdcs);
         vscode.window.showInformationMessage(
-          "AI Rulebook: synced core rule to `.clinerules/ai-rules/`. " +
+          "AI Rulebook: synced the rule pack to `.clinerules/ai-rules/`. " +
             "Skipped `.cursor/rules/ai-rules/` (host is not Cursor — change " +
             "`aiRules.installCursorRulesFolder` to `always` to install anyway)."
         );
@@ -220,16 +219,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     await ensureAiRulesIgnored(root);
-    await installCoreRule(bundleDir, rulesDir);
+    await installRulePack(bundleDir, rulesDir, mdcs);
     const parts = [
-      "AI Rulebook: installed the core rule into `.cursor/rules/ai-rules/`.",
+      "AI Rulebook: installed the rule pack into `.cursor/rules/ai-rules/`.",
     ];
     if (wantCline) {
-      await syncBundledMdcsToClinerules(root, bundleDir);
+      await syncBundledMdcsToClinerules(root, bundleDir, mdcs);
       parts.push("Cline: synced to `.clinerules/ai-rules/`.");
     }
     vscode.window.showInformationMessage(parts.join(" "));
-    await showCoreStatusInOutput(rulesOutput, rulesDir, mdcs);
+    await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
     treeProvider.refresh();
   };
 
@@ -259,32 +258,53 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       throw new Error(`Missing bundle at ${bundleDir}`);
     }
     await ensureAiRulesIgnored(root);
-    await installCoreRule(bundleDir, rulesDir);
-    const parts = ["AI Rulebook: installed the core rule into `.cursor/rules/ai-rules/`."];
+    await installRulePack(bundleDir, rulesDir, mdcs);
+    const parts = ["AI Rulebook: installed the rule pack into `.cursor/rules/ai-rules/`."];
     if (getAiRulesBoolean("autoSyncClineWhenInstalled", true) && isClineInstalled()) {
-      await syncBundledMdcsToClinerules(root, bundleDir);
+      await syncBundledMdcsToClinerules(root, bundleDir, mdcs);
       parts.push("Cline: synced to `.clinerules/ai-rules/`.");
     }
     vscode.window.showInformationMessage(parts.join(" "));
-    await showCoreStatusInOutput(rulesOutput, rulesDir, mdcs);
+    await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
     treeProvider.refresh();
   });
+
+  const setSelectedRuleEnabled = async (enabled: boolean): Promise<void> => {
+    const root = ensureWorkspace();
+    const action = enabled ? "enable" : "disable";
+    const ruleFile = await vscode.window.showQuickPick(mdcs, {
+      placeHolder: `Select a rule to ${action}`,
+    });
+    if (!ruleFile) {
+      return;
+    }
+    const rulesDir = workspaceRulesDir(root);
+    await setRuleEnabled(rulesDir, ruleFile, enabled);
+    vscode.window.showInformationMessage(
+      `AI Rulebook: ${ruleFile} ${enabled ? "enabled" : "disabled"} in this workspace.`
+    );
+    await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
+    treeProvider.refresh();
+  };
+
+  register("aiRules.enableRuleWorkspace", () => setSelectedRuleEnabled(true));
+  register("aiRules.disableRuleWorkspace", () => setSelectedRuleEnabled(false));
 
   register("aiRules.enableCoreWorkspace", async () => {
     const root = ensureWorkspace();
     const rulesDir = workspaceRulesDir(root);
-    await setRuleEnabled(rulesDir, CORE_RULE_FILE, true);
-    vscode.window.showInformationMessage("AI Rulebook: core rule enabled in this workspace.");
-    await showCoreStatusInOutput(rulesOutput, rulesDir, mdcs);
+    await Promise.all(mdcs.map((ruleFile) => setRuleEnabled(rulesDir, ruleFile, true)));
+    vscode.window.showInformationMessage("AI Rulebook: all rules enabled in this workspace.");
+    await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
     treeProvider.refresh();
   });
 
   register("aiRules.disableCoreWorkspace", async () => {
     const root = ensureWorkspace();
     const rulesDir = workspaceRulesDir(root);
-    await setRuleEnabled(rulesDir, CORE_RULE_FILE, false);
-    vscode.window.showInformationMessage("AI Rulebook: core rule disabled in this workspace.");
-    await showCoreStatusInOutput(rulesOutput, rulesDir, mdcs);
+    await Promise.all(mdcs.map((ruleFile) => setRuleEnabled(rulesDir, ruleFile, false)));
+    vscode.window.showInformationMessage("AI Rulebook: all rules disabled in this workspace.");
+    await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
     treeProvider.refresh();
   });
 
@@ -325,7 +345,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     explorerColors.refresh();
     treeProvider.refresh();
     await vscode.commands.executeCommand(`${RULES_TREE_VIEW_ID}.focus`);
-    await showCoreStatusInOutput(rulesOutput, workspaceRulesDir(root), mdcs);
+    await showRulePackStatusInOutput(rulesOutput, workspaceRulesDir(root), mdcs);
   });
 
   /**
@@ -341,15 +361,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await setColorRulesInExplorer(false);
     explorerColors.refresh();
     vscode.window.showInformationMessage(
-      "AI Rulebook: Explorer rule colors hidden. Run “AI Rulebook: Show core rule status” to bring them back."
+      "AI Rulebook: Explorer rule colors hidden. Run “AI Rulebook: Show rule pack status” to bring them back."
     );
   });
 
   register("aiRules.syncClineWorkspace", async () => {
     const root = ensureWorkspace();
-    await syncBundledMdcsToClinerules(root, bundleDir);
+    await syncBundledMdcsToClinerules(root, bundleDir, mdcs);
     vscode.window.showInformationMessage(
-      "AI Rulebook: wrote `.clinerules/ai-rules/ai-rules-core.md`."
+      "AI Rulebook: wrote the rule pack to `.clinerules/ai-rules/`."
     );
   });
 
@@ -381,7 +401,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           : null;
       if (!target) {
         vscode.window.showWarningMessage(
-          `AI Rulebook: ${rulePath} is not in this workspace yet—run “Install / update core rule” first.`
+          `AI Rulebook: ${rulePath} is not in this workspace yet—run “Install / update rule pack” first.`
         );
         return;
       }
@@ -411,7 +431,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       "AI Rulebook: workspace rules folder reset to defaults." +
         (clineSynced ? " Cline: synced to `.clinerules/ai-rules/`." : "")
     );
-    await showCoreStatusInOutput(rulesOutput, workspaceRulesDir(root), mdcs);
+    await showRulePackStatusInOutput(rulesOutput, workspaceRulesDir(root), mdcs);
     treeProvider.refresh();
   });
 

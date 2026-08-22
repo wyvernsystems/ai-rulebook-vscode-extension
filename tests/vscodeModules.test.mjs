@@ -34,6 +34,15 @@ const extension = await import("../out/extension.js");
 Module._load = originalModuleLoad;
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const RULE_FILES = [
+  "code.mdc",
+  "docs.mdc",
+  "git.mdc",
+  "markdown.mdc",
+  "scope.mdc",
+  "tests.mdc",
+];
+const SAMPLE_RULE = RULE_FILES[0];
 
 beforeEach(() => {
   resetVscodeMock();
@@ -261,12 +270,15 @@ describe("RuleStatusDecorationProvider", () => {
 });
 
 describe("RulesTreeProvider", () => {
-  test("getChildren lists only core.mdc", async () => {
+  test("getChildren lists every topic rule", async () => {
     workspace.workspaceFolders = [{ uri: Uri.file("/workspace") }];
-    const provider = new sidebarTreeView.RulesTreeProvider();
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
 
     const rules = await provider.getChildren();
-    assert.deepEqual(rules, [{ kind: "rule", ruleFile: "core.mdc" }]);
+    assert.deepEqual(
+      rules,
+      RULE_FILES.map((ruleFile) => ({ kind: "rule", ruleFile }))
+    );
     assert.deepEqual(await provider.getChildren(rules[0]), []);
   });
 
@@ -274,13 +286,13 @@ describe("RulesTreeProvider", () => {
     const root = await makeTempWorkspace();
     t.after(() => fs.rm(root, { recursive: true, force: true }));
     workspace.workspaceFolders = [{ uri: Uri.file(root) }];
-    const ruleFile = "core.mdc";
+    const ruleFile = SAMPLE_RULE;
     await writeFile(path.join(rulesOperations.workspaceRulesDir(root), ruleFile));
-    const provider = new sidebarTreeView.RulesTreeProvider();
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
 
     const item = await provider.getTreeItem({ kind: "rule", ruleFile });
 
-    assert.equal(item.label, "Core");
+    assert.equal(item.label, "Code");
     assert.equal(item.description, "Enabled");
     assert.equal(item.checkboxState, TreeItemCheckboxState.Checked);
     assert.equal(item.resourceUri.scheme, "ai-rules-status");
@@ -289,11 +301,11 @@ describe("RulesTreeProvider", () => {
   });
 
   test("getTreeItem reports a rule as off when no workspace is open", async () => {
-    const provider = new sidebarTreeView.RulesTreeProvider();
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
 
     const item = await provider.getTreeItem({
       kind: "rule",
-      ruleFile: "core.mdc",
+      ruleFile: SAMPLE_RULE,
     });
 
     assert.equal(item.description, "Disabled");
@@ -301,7 +313,7 @@ describe("RulesTreeProvider", () => {
   });
 
   test("refresh notifies tree listeners and registered callbacks", () => {
-    const provider = new sidebarTreeView.RulesTreeProvider();
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
     const treeEvents = [];
     let callbackCount = 0;
     provider.onDidChangeTreeData((value) => treeEvents.push(value));
@@ -317,10 +329,10 @@ describe("RulesTreeProvider", () => {
 });
 
 describe("bindRulesTreeView", () => {
-  const ruleNode = { kind: "rule", ruleFile: "core.mdc" };
+  const ruleNode = { kind: "rule", ruleFile: SAMPLE_RULE };
 
   test("checkbox changes show a warning and restore the tree when no workspace is open", async () => {
-    const provider = new sidebarTreeView.RulesTreeProvider();
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
     const refreshEvents = [];
     provider.onDidChangeTreeData((value) => refreshEvents.push(value));
     const context = { subscriptions: [] };
@@ -343,7 +355,7 @@ describe("bindRulesTreeView", () => {
     workspace.workspaceFolders = [{ uri: Uri.file(root) }];
     const rulesDir = rulesOperations.workspaceRulesDir(root);
     await writeFile(path.join(rulesDir, ruleNode.ruleFile));
-    const provider = new sidebarTreeView.RulesTreeProvider();
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
     const context = { subscriptions: [] };
     let afterChangeCount = 0;
 
@@ -368,22 +380,21 @@ describe("rule status UI", () => {
     assert.equal(channel.name, "AI Rulebook");
   });
 
-  test("showCoreStatusInOutput reports both core rule states without ANSI escapes", async (t) => {
+  test("showRulePackStatusInOutput reports rule states without ANSI escapes", async (t) => {
     const rulesDir = await makeTempWorkspace();
     t.after(() => fs.rm(rulesDir, { recursive: true, force: true }));
-    const coreRule = "core.mdc";
-    await writeFile(path.join(rulesDir, coreRule));
+    await writeFile(path.join(rulesDir, SAMPLE_RULE));
     const channel = ruleStatusUi.createAiRulesOutputChannel();
 
-    await ruleStatusUi.showCoreStatusInOutput(channel, rulesDir, [coreRule]);
+    await ruleStatusUi.showRulePackStatusInOutput(channel, rulesDir, [SAMPLE_RULE]);
 
     assert.equal(channel.clearCount, 1);
-    assert.ok(channel.lines.includes(`active\t${coreRule}`));
+    assert.ok(channel.lines.includes(`active\t${SAMPLE_RULE}`));
     assert.doesNotMatch(channel.lines.join("\n"), /\u001b\[/);
 
-    await rulesOperations.setRuleEnabled(rulesDir, coreRule, false);
-    await ruleStatusUi.showCoreStatusInOutput(channel, rulesDir, [coreRule]);
-    assert.ok(channel.lines.includes(`off   \t${coreRule}`));
+    await rulesOperations.setRuleEnabled(rulesDir, SAMPLE_RULE, false);
+    await ruleStatusUi.showRulePackStatusInOutput(channel, rulesDir, [SAMPLE_RULE]);
+    assert.ok(channel.lines.includes(`off   \t${SAMPLE_RULE}`));
   });
 
 });
@@ -397,7 +408,7 @@ describe("extension activation", () => {
     await extension.activate(context);
 
     assert.equal(state.errors.length, 1);
-    assert.match(state.errors[0], /failed to load core rule/);
+    assert.match(state.errors[0], /failed to load rule pack/);
     assert.equal(state.registeredCommands.size, 0);
     assert.equal(values.size, 0);
   });
@@ -420,7 +431,7 @@ describe("extension activation", () => {
     assert.equal(state.errors.length, 0);
   });
 
-  test("activate auto-installs core.mdc for a Cursor workspace", async (t) => {
+  test("activate auto-installs the topic rules for a Cursor workspace", async (t) => {
     const workspaceRoot = await makeTempWorkspace();
     t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
     workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
@@ -430,27 +441,26 @@ describe("extension activation", () => {
 
     await extension.activate(context);
 
-    const installedCore = path.join(
-      rulesOperations.workspaceRulesDir(workspaceRoot),
-      "core.mdc"
-    );
-    assert.equal(await rulesOperations.pathExists(installedCore), true);
+    const rulesDir = rulesOperations.workspaceRulesDir(workspaceRoot);
+    for (const ruleFile of RULE_FILES) {
+      assert.equal(await rulesOperations.pathExists(path.join(rulesDir, ruleFile)), true);
+    }
     assert.equal(
       await fs.readFile(path.join(workspaceRoot, ".gitignore"), "utf8"),
       `${rulesOperations.GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`
     );
-    assert.ok(state.informationMessages.some((message) => /installed the core rule/.test(message)));
-    assert.ok(state.outputChannels[0].lines.some((line) => line === "active\tcore.mdc"));
+    assert.ok(state.informationMessages.some((message) => /installed the rule pack/.test(message)));
+    assert.ok(state.outputChannels[0].lines.some((line) => line === `active\t${SAMPLE_RULE}`));
   });
 
-  test("activate adds ignore entries when core.mdc already exists", async (t) => {
+  test("activate adds ignore entries when the rules folder already exists", async (t) => {
     const workspaceRoot = await makeTempWorkspace();
     t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
     workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
     vscode.env.uriScheme = "cursor";
     vscode.env.appName = "Cursor";
     await writeFile(
-      path.join(rulesOperations.workspaceRulesDir(workspaceRoot), "core.mdc"),
+      path.join(rulesOperations.workspaceRulesDir(workspaceRoot), SAMPLE_RULE),
       "existing\n"
     );
     const { context } = makeExtensionContext(repoRoot);
@@ -461,6 +471,52 @@ describe("extension activation", () => {
       await fs.readFile(path.join(workspaceRoot, ".gitignore"), "utf8"),
       `${rulesOperations.GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`
     );
+  });
+
+  test("workspace pack commands disable and enable every topic rule", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    const rulesDir = rulesOperations.workspaceRulesDir(workspaceRoot);
+    await Promise.all(
+      RULE_FILES.map((ruleFile) => writeFile(path.join(rulesDir, ruleFile)))
+    );
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+
+    await state.registeredCommands.get("aiRules.disableCoreWorkspace")();
+    for (const ruleFile of RULE_FILES) {
+      assert.equal(await rulesOperations.isRuleEnabled(rulesDir, ruleFile), false);
+    }
+
+    await state.registeredCommands.get("aiRules.enableCoreWorkspace")();
+    for (const ruleFile of RULE_FILES) {
+      assert.equal(await rulesOperations.isRuleEnabled(rulesDir, ruleFile), true);
+    }
+  });
+
+  test("individual commands change only the selected topic rule", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    const rulesDir = rulesOperations.workspaceRulesDir(workspaceRoot);
+    await Promise.all(
+      RULE_FILES.map((ruleFile) => writeFile(path.join(rulesDir, ruleFile)))
+    );
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+    state.quickPickSelection = SAMPLE_RULE;
+
+    await state.registeredCommands.get("aiRules.disableRuleWorkspace")();
+
+    assert.equal(await rulesOperations.isRuleEnabled(rulesDir, SAMPLE_RULE), false);
+    assert.equal(await rulesOperations.isRuleEnabled(rulesDir, RULE_FILES[1]), true);
+    assert.deepEqual(state.quickPickRequests[0].items, RULE_FILES);
+
+    await state.registeredCommands.get("aiRules.enableRuleWorkspace")();
+    assert.equal(await rulesOperations.isRuleEnabled(rulesDir, SAMPLE_RULE), true);
   });
 
   test("activate mirrors to Cline without creating Cursor rules on a non-Cursor host", async (t) => {
@@ -478,7 +534,7 @@ describe("extension activation", () => {
     );
     assert.equal(
       await rulesOperations.pathExists(
-        path.join(workspaceRoot, ".clinerules", "ai-rules", "ai-rules-core.md")
+        path.join(workspaceRoot, ".clinerules", "ai-rules", "ai-rules-code.md")
       ),
       true
     );

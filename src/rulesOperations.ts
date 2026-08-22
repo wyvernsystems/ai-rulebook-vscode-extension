@@ -8,7 +8,7 @@ import {
 } from "./safePaths";
 
 const RULES_SUBDIR = "ai-rules";
-export const CORE_RULE_FILE = "core.mdc";
+const LEGACY_CORE_RULE_FILE = "core.mdc";
 export const GENERATED_RULE_IGNORE_ENTRIES = [
   "/.cursor/rules/ai-rules/",
   "/.clinerules/ai-rules/",
@@ -134,24 +134,35 @@ export async function setRuleEnabled(
   }
 }
 
-async function bundledCoreRulePath(bundleDir: string): Promise<string> {
-  const core = safeJoinUnderBase(bundleDir, CORE_RULE_FILE, "bundle directory");
-  if (!(await pathExists(core))) {
-    throw new Error(`Bundled core rule missing: ${CORE_RULE_FILE}`);
+async function bundledRulePath(bundleDir: string, ruleFile: string): Promise<string> {
+  const source = safeJoinUnderBase(bundleDir, ruleFile, "bundle directory");
+  if (!(await pathExists(source))) {
+    throw new Error(`Bundled rule missing: ${ruleFile}`);
   }
-  return core;
+  return source;
 }
 
-/** Installs the active core rule while preserving unrelated workspace files. */
-export async function installCoreRule(
+/** Installs every active bundled rule while preserving unrelated workspace files. */
+export async function installRulePack(
   bundleDir: string,
-  rulesDir: string
+  rulesDir: string,
+  ruleFiles: readonly string[]
 ): Promise<void> {
-  const src = await bundledCoreRulePath(bundleDir);
-  const dest = safeJoinUnderBase(rulesDir, CORE_RULE_FILE, "rules directory");
+  const copies = await Promise.all(
+    ruleFiles.map(async (ruleFile) => ({
+      source: await bundledRulePath(bundleDir, ruleFile),
+      destination: safeJoinUnderBase(rulesDir, ruleFile, "rules directory"),
+    }))
+  );
   await fs.mkdir(rulesDir, { recursive: true });
-  await fs.rm(`${dest}.disabled`, { force: true });
-  await fs.copyFile(src, dest);
+  for (const { source, destination } of copies) {
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await fs.rm(`${destination}.disabled`, { force: true });
+    await fs.copyFile(source, destination);
+  }
+  const legacyCore = safeJoinUnderBase(rulesDir, LEGACY_CORE_RULE_FILE, "rules directory");
+  await fs.rm(legacyCore, { force: true });
+  await fs.rm(`${legacyCore}.disabled`, { force: true });
 }
 
 export async function resetRulesDirToBundle(
@@ -166,14 +177,25 @@ export async function resetRulesDirToBundle(
 
 export async function syncBundledMdcsToClinerules(
   workspaceRoot: string,
-  bundleDir: string
+  bundleDir: string,
+  ruleFiles: readonly string[]
 ): Promise<void> {
   await ensureAiRulesIgnored(workspaceRoot);
   const dest = path.join(workspaceRoot, ".clinerules", RULES_SUBDIR);
+  const mirrors = await Promise.all(
+    ruleFiles.map(async (ruleFile) => {
+      const source = await bundledRulePath(bundleDir, ruleFile);
+      const mirrorName = `ai-rules-${ruleFile.slice(0, -".mdc".length).replaceAll("/", "-")}.md`;
+      return {
+        source,
+        destination: safeJoinUnderBase(dest, mirrorName, "Cline rules directory"),
+      };
+    })
+  );
   await fs.mkdir(dest, { recursive: true });
-  const srcPath = await bundledCoreRulePath(bundleDir);
-  const destPath = path.join(dest, "ai-rules-core.md");
-  assertContainedPath(dest, destPath, "Cline rules directory");
-  const body = await fs.readFile(srcPath, "utf8");
-  await fs.writeFile(destPath, body, "utf8");
+  for (const { source, destination } of mirrors) {
+    const body = await fs.readFile(source, "utf8");
+    await fs.writeFile(destination, body, "utf8");
+  }
+  await fs.rm(path.join(dest, "ai-rules-core.md"), { force: true });
 }

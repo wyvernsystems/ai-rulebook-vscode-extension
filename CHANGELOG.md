@@ -6,28 +6,34 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-08-22
+
 ### Added
 
 - **Tests**: `tests/safePaths.test.mjs`, `tests/manifest.test.mjs`, and
   `tests/rulesOperations.test.mjs` cover path containment, manifest
-  validation, core-rule toggle/install/reset, and Cline mirroring (`npm test`).
+  validation, rule-pack toggle/install/reset, and Cline mirroring (`npm test`).
 - **Generated rule folders stay local.** Install and Cline sync add
   `/.cursor/rules/ai-rules/` and `/.clinerules/ai-rules/` to the workspace
   `.gitignore`.
 
 ### Changed
 
-- **Sidebar presentation refined.** The core rule uses a readable label,
-  clearer tooltip, and consistent Enabled / Disabled wording. An
+- **Sidebar presentation refined.** Each rule uses a readable label, clearer
+  tooltip, and consistent Enabled / Disabled wording. An
   empty-workspace welcome action opens a project folder.
 - **Theme-aware UI palette.** New configurable enabled and disabled color
   tokens keep sidebar and Explorer styling consistent across light, dark, and
   high-contrast themes.
-- **Rule pack compressed to one file.** `core.mdc` is always on and combines
-  stable dependencies, reuse, feature organization, unit tests and coverage,
-  project-document upkeep, and Markdown conventions.
-- **Core guidance made actionable.** Requirements now define applicability,
-  scoped changes, verification reporting, and baseline input and secret safety.
+- **Rule pack split by topic.** Six always-on rules separately cover scope,
+  code, tests, documentation, Markdown, and Git, and the extension installs,
+  toggles, reports, and syncs each rule.
+- **Rule-state commands expanded.** Command-palette actions can enable or
+  disable one selected rule or the complete pack; all rules remain enabled by
+  default.
+- **Engineering guidance refined.** Rules prioritize task scope and local
+  conventions, prohibit test weakening and unrequested Git mutations, and
+  define explicit documentation-update triggers.
 - **Clean compilation.** `npm run compile` removes stale `out/` files before
   rebuilding so deleted modules cannot enter the VSIX.
 - **README simplified.** Setup, commands, rule location, and development steps
@@ -35,9 +41,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Removed
 
-- Role, mode, testing, documentation, context, security, and rule-authoring
-  rule files and their mode commands. Their essential constraints now live in
-  `core.mdc`.
+- The consolidated `core.mdc`; its constraints now live in focused topic
+  rules.
 - Empty category folders, redundant global-mirror and one-item toggle commands,
   and the duplicated `ABOUT_RULES.md`.
 

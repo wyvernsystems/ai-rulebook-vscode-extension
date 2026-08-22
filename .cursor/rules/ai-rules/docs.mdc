@@ -1,0 +1,13 @@
+---
+description: Documentation update triggers
+alwaysApply: true
+---
+
+# Docs
+
+Update only when the file already exists and the trigger applies:
+
+- `REQUIREMENTS.md` — testable behavior changed.
+- `README.md` — usage or configuration changed.
+- `DEPLOY.md` — deploy steps, environment variables, or infra config changed.
+- `CHANGELOG.md` — release-worthy change, under `[Unreleased]`.

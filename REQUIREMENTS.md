@@ -6,14 +6,16 @@ details belong in the code or in the rule files.
 
 ## Functional
 
-- The extension installs one always-on `core.mdc` into
-  `.cursor/rules/ai-rules/` of the open workspace.
+- The extension installs six always-on topic rules (`scope.mdc`, `code.mdc`,
+  `tests.mdc`, `docs.mdc`, `markdown.mdc`, and `git.mdc`) into
+  `.cursor/rules/ai-rules/` of the open workspace. Each rule has
+  `alwaysApply: true` and is installed enabled by default.
 - Before writing Cursor or Cline rules, the extension idempotently adds
   `/.cursor/rules/ai-rules/` and `/.clinerules/ai-rules/` to the workspace
   `.gitignore`, creating the file when absent.
 - On activation (and on `onDidChangeWorkspaceFolders`), if the workspace has
   no `.cursor/rules/ai-rules/` folder yet, the extension installs the bundled
-  core rule automatically. Existing rules folders are never overwritten by
+  rule pack automatically. Existing rules folders are never overwritten by
   the auto-install path. The behavior is gated by
   `aiRules.autoInstallOnOpenWorkspace` (default `true`).
 - The `.cursor/rules/ai-rules/` auto-install is further gated by
@@ -43,22 +45,23 @@ details belong in the code or in the rule files.
   touching the sidebar:
   - `AI Rulebook: Hide rule colors` sets
     `aiRules.colorRulesInExplorer` to `false`.
-  - `AI Rulebook: Show core rule status` sets it back to `true`
+  - `AI Rulebook: Show rule pack status` sets it back to `true`
     (idempotent), focuses the sidebar, and writes a plain-text snapshot to
     the Output channel.
 - Source of truth for rule text is `.cursor/rules/ai-rules/`. The VSIX ships
   a byte-identical copy under `bundled/ai-rules/`. `npm run verify:bundled`
   must pass before packaging.
-- The bundled rule requires latest stable/LTS runtimes and maintained stable
-  libraries; reuse over duplication; feature organization; unit tests and a
-  coverage report; maintained `CHANGELOG.md`, `REQUIREMENTS.md`, and
-  `README.md`; and consistent Markdown.
-- The `AI Rulebook: Core Rule` sidebar view lists `core.mdc` with a checkbox
-  that toggles `core.mdc` ↔ `core.mdc.disabled`.
+- The bundled rules constrain task scope, code reuse and organization,
+  dependency choices, input and error safety, testing integrity, triggered
+  documentation updates, Markdown formatting, and unrequested Git mutations.
+- The `AI Rulebook: Rule Pack` sidebar view lists every topic rule with a
+  checkbox that toggles `<name>.mdc` ↔ `<name>.mdc.disabled`.
+- Command-palette actions enable or disable one selected topic rule, and
+  separate actions enable or disable the complete rule pack.
 - When Cline is installed (`saoudrizwan.claude-dev` or
   `saoudrizwan.cline-nightly`) and `aiRules.autoSyncClineWhenInstalled` is
-  on, the extension mirrors `core.mdc` into `.clinerules/ai-rules/` as
-  `ai-rules-core.md` after install, reset, manual sync, and first detection.
+  on, the extension mirrors each topic rule into `.clinerules/ai-rules/` as
+  `ai-rules-<topic>.md` after install, reset, manual sync, and first detection.
 
 ## Non-functional
 
@@ -95,10 +98,10 @@ details belong in the code or in the rule files.
   (`icon-source.png`) is preserved locally for re-rendering but excluded
   from the package.
 - README is the marketplace description; it must be plain English and list
-  the shipped rule, every command, and rule limitations.
+  the shipped rules, every command, and rule limitations.
 - CHANGELOG follows [Keep a Changelog](https://keepachangelog.com/) with an
   `[Unreleased]` section at the top.
-- `core.mdc` must remain compressed, imperative, and scannable.
+- Each topic rule must remain focused, imperative, and scannable.
 
 ## Out of scope
 

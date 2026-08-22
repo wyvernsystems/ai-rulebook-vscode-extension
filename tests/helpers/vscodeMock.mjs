@@ -10,6 +10,8 @@ export const state = {
   decorationProviders: [],
   registeredCommands: new Map(),
   executedCommands: [],
+  quickPickRequests: [],
+  quickPickSelection: undefined,
 };
 
 export class EventEmitter {
@@ -185,6 +187,11 @@ export const window = {
     return { dispose() {} };
   },
 
+  async showQuickPick(items, options) {
+    state.quickPickRequests.push({ items, options });
+    return state.quickPickSelection;
+  },
+
   async showWarningMessage(message) {
     state.warnings.push(message);
   },
@@ -223,6 +230,8 @@ export function resetVscodeMock() {
   state.decorationProviders = [];
   state.registeredCommands.clear();
   state.executedCommands = [];
+  state.quickPickRequests = [];
+  state.quickPickSelection = undefined;
   workspace.workspaceFolders = undefined;
   env.uriScheme = "vscode";
   env.appName = "Visual Studio Code";

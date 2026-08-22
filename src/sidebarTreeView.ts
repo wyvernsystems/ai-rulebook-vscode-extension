@@ -1,10 +1,5 @@
 import * as vscode from "vscode";
-import {
-  CORE_RULE_FILE,
-  isRuleEnabled,
-  setRuleEnabled,
-  workspaceRulesDir,
-} from "./rulesOperations";
+import { isRuleEnabled, setRuleEnabled, workspaceRulesDir } from "./rulesOperations";
 import { UI_COLORS } from "./uiPresentation";
 
 /** ID must match the view contributed in package.json. */
@@ -67,9 +62,11 @@ export class RuleStatusDecorationProvider implements vscode.FileDecorationProvid
 }
 
 /**
- * Tree data provider for the bundled core rule.
+ * Tree data provider for the bundled rule pack.
  */
 export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
+  constructor(private readonly ruleFiles: readonly string[]) {}
+
   private readonly _onDidChange = new vscode.EventEmitter<Node | undefined>();
   readonly onDidChangeTreeData = this._onDidChange.event;
 
@@ -100,7 +97,9 @@ export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
       if (!vscode.workspace.workspaceFolders?.length) {
         return Promise.resolve([]);
       }
-      return Promise.resolve([{ kind: "rule", ruleFile: CORE_RULE_FILE }]);
+      return Promise.resolve(
+        this.ruleFiles.map((ruleFile) => ({ kind: "rule", ruleFile }))
+      );
     }
     return Promise.resolve([]);
   }
@@ -108,7 +107,12 @@ export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
   private async ruleTreeItem(node: RuleItem): Promise<vscode.TreeItem> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const enabled = root ? await isRuleEnabled(workspaceRulesDir(root), node.ruleFile) : false;
-    const label = "Core";
+    const label = node.ruleFile
+      .replace(/\.mdc$/, "")
+      .split(/[-_/]/)
+      .filter(Boolean)
+      .map((part) => part[0].toUpperCase() + part.slice(1))
+      .join(" ");
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
     item.description = enabled ? "Enabled" : "Disabled";
     item.tooltip =

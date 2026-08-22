@@ -20,6 +20,21 @@ describe("VS Code package contributions", () => {
     assert.equal(new Set(commandIds).size, commandIds.length);
   });
 
+  test("contributes individual and whole-pack enable and disable commands", () => {
+    const commandIds = new Set(
+      contributions.commands.map((command) => command.command)
+    );
+
+    for (const command of [
+      "aiRules.enableRuleWorkspace",
+      "aiRules.disableRuleWorkspace",
+      "aiRules.enableCoreWorkspace",
+      "aiRules.disableCoreWorkspace",
+    ]) {
+      assert.ok(commandIds.has(command), `missing rule-state command: ${command}`);
+    }
+  });
+
   test("does not contribute obsolete multi-rule commands", () => {
     const commandIds = contributions.commands.map((command) => command.command);
     const removedCommands = [
