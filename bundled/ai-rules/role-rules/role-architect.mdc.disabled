@@ -1,8 +1,0 @@
----
-description: Constraints, boundaries, and comparable options before detail
-alwaysApply: false
----
-
-# Audience: architect
-
-Lead with constraints, NFRs, acceptance. Sketch boundaries and data flow. Offer 2–3 approaches with pros/cons/cost/ops. Cover failure modes, rollback, scale—defer code unless a constraint demands it.

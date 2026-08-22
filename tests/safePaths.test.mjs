@@ -12,9 +12,9 @@ import {
 
 describe("isSafeManifestEntry", () => {
   test("accepts forward-slash relative pack paths", () => {
-    assert.equal(isSafeManifestEntry("coding-rules/write-clean-code.mdc"), true);
-    assert.equal(isSafeManifestEntry("ABOUT_RULES.md"), true);
-    assert.equal(isSafeManifestEntry("ai-rules-coding-rules-write-clean-code.md"), true);
+    assert.equal(isSafeManifestEntry("core.mdc"), true);
+    assert.equal(isSafeManifestEntry("nested/rule.mdc"), true);
+    assert.equal(isSafeManifestEntry("ai-rules-core.md"), true);
   });
 
   test("rejects empty, over-long, and non-string values", () => {
@@ -30,7 +30,7 @@ describe("isSafeManifestEntry", () => {
     assert.equal(isSafeManifestEntry("../etc/passwd"), false);
     assert.equal(isSafeManifestEntry("foo/../bar.mdc"), false);
     assert.equal(isSafeManifestEntry("/etc/passwd"), false);
-    assert.equal(isSafeManifestEntry("./coding-rules/x.mdc"), false);
+    assert.equal(isSafeManifestEntry("./nested/rule.mdc"), false);
     assert.equal(isSafeManifestEntry("\\windows\\path"), false);
   });
 
@@ -47,7 +47,7 @@ describe("isContainedPath / assertContainedPath", () => {
 
   test("the base itself and files under it are contained", () => {
     assert.equal(isContainedPath(base, base), true);
-    assert.equal(isContainedPath(base, path.join(base, "coding-rules", "x.mdc")), true);
+    assert.equal(isContainedPath(base, path.join(base, "nested", "rule.mdc")), true);
   });
 
   test("siblings and parent escapes are not contained", () => {
@@ -70,7 +70,7 @@ describe("endsWithPathSegments / assertSafeDeletionTarget", () => {
   test("matches the expected suffix regardless of extra ancestors", () => {
     const target = path.join("/Users", "me", "proj", ".cursor", "rules", "ai-rules");
     assert.equal(endsWithPathSegments(target, [".cursor", "rules", "ai-rules"]), true);
-    assert.equal(endsWithPathSegments(target, ["ai-rules-mirror", "ai-rules"]), false);
+    assert.equal(endsWithPathSegments(target, ["other", "ai-rules"]), false);
   });
 
   test("rejects a path shorter than the expected suffix", () => {

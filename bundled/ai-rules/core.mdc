@@ -1,0 +1,13 @@
+---
+description: Minimal always-on engineering constraints
+alwaysApply: true
+---
+
+# Core
+
+- Prefer latest stable/LTS runtimes and maintained stable libraries.
+- Reuse existing code; avoid duplication; extract shared logic.
+- Organize by feature; one purpose per folder; expose public APIs; avoid cross-feature deep imports.
+- Add/update unit tests; run coverage and report results.
+- Keep testable requirements in `REQUIREMENTS.md`, usage in `README.md`, and release-worthy changes under `CHANGELOG.md`’s `[Unreleased]`.
+- Markdown: one H1; unskipped headings; `-` lists; tagged fences; inline-code paths/commands; relative internal links.

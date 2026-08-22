@@ -1,6 +1,11 @@
 import * as vscode from "vscode";
-import type { BundleManifest } from "./manifest";
-import { isRuleEnabled, setRuleEnabled, workspaceRulesDir } from "./rulesOperations";
+import {
+  CORE_RULE_FILE,
+  isRuleEnabled,
+  setRuleEnabled,
+  workspaceRulesDir,
+} from "./rulesOperations";
+import { UI_COLORS } from "./uiPresentation";
 
 /** ID must match the view contributed in package.json. */
 export const RULES_TREE_VIEW_ID = "aiRules.rulesTree";
@@ -12,28 +17,12 @@ export const RULES_TREE_VIEW_ID = "aiRules.rulesTree";
  */
 const RULE_STATUS_SCHEME = "ai-rules-status";
 
-type FolderItem = {
-  kind: "folder";
-  folder: string;
-};
-
 type RuleItem = {
   kind: "rule";
   ruleFile: string; // forward-slash relative path from manifest
 };
 
-type Node = FolderItem | RuleItem;
-
-function folderOf(rulePath: string): string {
-  const slash = rulePath.indexOf("/");
-  return slash === -1 ? "" : rulePath.slice(0, slash);
-}
-
-function leafName(rulePath: string): string {
-  const slash = rulePath.lastIndexOf("/");
-  const base = slash === -1 ? rulePath : rulePath.slice(slash + 1);
-  return base.replace(/\.mdc$/i, "");
-}
+type Node = RuleItem;
 
 function ruleStatusUri(ruleFile: string, enabled: boolean): vscode.Uri {
   return vscode.Uri.from({
@@ -44,8 +33,8 @@ function ruleStatusUri(ruleFile: string, enabled: boolean): vscode.Uri {
 
 /**
  * Colors rule labels in the sidebar tree:
- *   - active rules → `testing.iconPassed` (green in default themes)
- *   - disabled rules → `disabledForeground` (muted)
+ *   - active rules → AI Rulebook's theme-aware success color
+ *   - disabled rules → AI Rulebook's theme-aware muted color
  * Stateless: the URI path encodes the on/off state, so refreshing the tree
  * (which rebuilds resource URIs) updates colors without provider state.
  */
@@ -61,49 +50,35 @@ export class RuleStatusDecorationProvider implements vscode.FileDecorationProvid
     if (uri.scheme !== RULE_STATUS_SCHEME) {
       return undefined;
     }
-    const isActive = uri.path.startsWith("/on/");
-    if (isActive) {
+    if (uri.path.startsWith("/on/")) {
       return {
-        color: new vscode.ThemeColor("testing.iconPassed"),
-        tooltip: "Active — loaded by Cursor",
+        color: new vscode.ThemeColor(UI_COLORS.active),
+        tooltip: "Enabled — loaded by Cursor",
       };
     }
-    return {
-      color: new vscode.ThemeColor("disabledForeground"),
-      tooltip: "Disabled — `.mdc.disabled` on disk",
-    };
+    if (uri.path.startsWith("/off/")) {
+      return {
+        color: new vscode.ThemeColor(UI_COLORS.inactive),
+        tooltip: "Disabled — not loaded by Cursor",
+      };
+    }
+    return undefined;
   }
 }
 
 /**
- * Tree data provider that lists each shipped rule grouped by its top-level
- * subfolder in the manifest. Each rule row uses VS Code's TreeItem checkbox so
- * the user can flip rules on / off without leaving the sidebar.
+ * Tree data provider for the bundled core rule.
  */
 export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
   private readonly _onDidChange = new vscode.EventEmitter<Node | undefined>();
   readonly onDidChangeTreeData = this._onDidChange.event;
 
-  private readonly mdcs: readonly string[];
-  private readonly folders: readonly string[];
   /**
    * Callbacks fired after every tree refresh. Lets sibling decoration
    * providers (sidebar colors, Explorer colors) re-publish without each
    * call site having to know about them.
    */
   private readonly afterRefresh: Array<() => void> = [];
-
-  constructor(manifest: BundleManifest) {
-    this.mdcs = manifest.files.filter((f) => f.endsWith(".mdc"));
-    const seen = new Set<string>();
-    for (const f of this.mdcs) {
-      const folder = folderOf(f);
-      if (folder) {
-        seen.add(folder);
-      }
-    }
-    this.folders = [...seen].sort();
-  }
 
   onAfterRefresh(cb: () => void): void {
     this.afterRefresh.push(cb);
@@ -117,51 +92,40 @@ export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
   }
 
   getTreeItem(node: Node): Promise<vscode.TreeItem> {
-    if (node.kind === "folder") {
-      return Promise.resolve(this.folderTreeItem(node));
-    }
     return this.ruleTreeItem(node);
   }
 
   getChildren(parent?: Node): Promise<Node[]> {
     if (!parent) {
-      return Promise.resolve(
-        this.folders.map((folder): Node => ({ kind: "folder", folder }))
-      );
-    }
-    if (parent.kind === "folder") {
-      const inFolder = this.mdcs
-        .filter((f) => folderOf(f) === parent.folder)
-        .sort()
-        .map((ruleFile): Node => ({ kind: "rule", ruleFile }));
-      return Promise.resolve(inFolder);
+      if (!vscode.workspace.workspaceFolders?.length) {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve([{ kind: "rule", ruleFile: CORE_RULE_FILE }]);
     }
     return Promise.resolve([]);
-  }
-
-  private folderTreeItem(node: FolderItem): vscode.TreeItem {
-    const item = new vscode.TreeItem(node.folder, vscode.TreeItemCollapsibleState.Expanded);
-    item.contextValue = "aiRulesFolder";
-    item.iconPath = new vscode.ThemeIcon("folder");
-    item.tooltip = `Right-click to enable / disable every rule in ${node.folder}.`;
-    return item;
   }
 
   private async ruleTreeItem(node: RuleItem): Promise<vscode.TreeItem> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const enabled = root ? await isRuleEnabled(workspaceRulesDir(root), node.ruleFile) : false;
-    const item = new vscode.TreeItem(leafName(node.ruleFile), vscode.TreeItemCollapsibleState.None);
-    item.description = enabled ? "active" : "off";
-    item.tooltip = `${node.ruleFile}\n\nClick the checkbox to toggle.`;
-    item.contextValue = enabled ? "aiRulesRuleEnabled" : "aiRulesRuleDisabled";
+    const label = "Core";
+    const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
+    item.description = enabled ? "Enabled" : "Disabled";
+    item.tooltip =
+      `${label} · ${enabled ? "Enabled" : "Disabled"}\n${node.ruleFile}\n\n` +
+      "Use the checkbox to change its status. Select the name to open the rule.";
     item.checkboxState = enabled
       ? vscode.TreeItemCheckboxState.Checked
       : vscode.TreeItemCheckboxState.Unchecked;
     item.iconPath = new vscode.ThemeIcon(
       enabled ? "pass-filled" : "circle-outline",
-      new vscode.ThemeColor(enabled ? "testing.iconPassed" : "descriptionForeground")
+      new vscode.ThemeColor(enabled ? UI_COLORS.active : UI_COLORS.inactive)
     );
     item.resourceUri = ruleStatusUri(node.ruleFile, enabled);
+    item.accessibilityInformation = {
+      label: `${label}, ${enabled ? "enabled" : "disabled"}`,
+      role: "checkbox",
+    };
     item.command = {
       command: "aiRules.revealRuleFile",
       title: "Open rule file",
@@ -170,10 +134,6 @@ export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
     return item;
   }
 
-  /** All rules under a folder (forward-slash relative paths). */
-  rulesInFolder(folder: string): readonly string[] {
-    return this.mdcs.filter((f) => folderOf(f) === folder);
-  }
 }
 
 /**
@@ -188,7 +148,6 @@ export function bindRulesTreeView(
 ): vscode.TreeView<Node> {
   const view = vscode.window.createTreeView<Node>(RULES_TREE_VIEW_ID, {
     treeDataProvider: provider,
-    showCollapseAll: true,
     canSelectMany: false,
   });
 
@@ -201,9 +160,6 @@ export function bindRulesTreeView(
     }
     const rulesDir = workspaceRulesDir(root);
     for (const [node, state] of e.items) {
-      if (node.kind !== "rule") {
-        continue;
-      }
       const enable = state === vscode.TreeItemCheckboxState.Checked;
       try {
         await setRuleEnabled(rulesDir, node.ruleFile, enable);

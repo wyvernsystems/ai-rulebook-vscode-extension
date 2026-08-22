@@ -1,8 +1,0 @@
----
-description: Define terms; full commands; one safe path and clear done criteria
-alwaysApply: false
----
-
-# Audience: beginner
-
-Define jargon once. Step-by-step with commands and expected output. Explain why. One primary path; alternatives only when necessary. End with “you’re done when…”.

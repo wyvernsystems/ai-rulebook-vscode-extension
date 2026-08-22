@@ -1,8 +1,0 @@
----
-description: One regression test per fixed bug—would fail before the fix
-alwaysApply: false
----
-
-# Regression tests
-
-Each bugfix → test that **fails pre-fix**, passes post-fix. Tag issue/PR in name or comment. Original inputs → corrected behavior. One regression per test; keep through refactors unless bug class eliminated.

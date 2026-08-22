@@ -1,8 +1,0 @@
----
-description: Top user journeys—stable selectors, state waits, no flake tolerance
-alwaysApply: false
----
-
-# E2E tests
-
-Cover main journeys (value/safety), not every screen. Selectors: `data-testid`, roles, text—not brittle CSS. Wait on UI/network state, not blind sleep. Clean auth/storage per test. Save screenshots/trace on fail. Flakes = bugs to fix—don’t paper over with retries.

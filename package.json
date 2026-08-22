@@ -1,7 +1,7 @@
 {
   "name": "ai-rulebook",
   "displayName": "AI Rulebook",
-  "description": "AI Rulebook — install and manage a curated AI agent rule pack for Cursor under .cursor/rules/ai-rules/, with optional Cline sync to .clinerules/ai-rules/.",
+  "description": "AI Rulebook — install and manage one compact, always-on engineering rule for Cursor, with optional Cline sync.",
   "version": "1.4.0",
   "publisher": "WyvernSystemsLLC",
   "license": "MIT",
@@ -42,82 +42,37 @@
     "commands": [
       {
         "command": "aiRules.installWorkspace",
-        "title": "AI Rulebook: Install / update rules in workspace",
+        "title": "AI Rulebook: Install / update core rule",
         "category": "AI Rulebook"
       },
       {
-        "command": "aiRules.enableAllWorkspace",
-        "title": "AI Rulebook: Enable all rules (workspace)",
+        "command": "aiRules.enableCoreWorkspace",
+        "title": "AI Rulebook: Enable core rule (workspace)",
         "category": "AI Rulebook"
       },
       {
-        "command": "aiRules.disableAllWorkspace",
-        "title": "AI Rulebook: Disable all rules (workspace)",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.enableAllGlobal",
-        "title": "AI Rulebook: Enable all rules (global mirror)",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.disableAllGlobal",
-        "title": "AI Rulebook: Disable all rules (global mirror)",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.applyGlobalToWorkspace",
-        "title": "AI Rulebook: Copy global mirror into workspace",
+        "command": "aiRules.disableCoreWorkspace",
+        "title": "AI Rulebook: Disable core rule (workspace)",
         "category": "AI Rulebook"
       },
       {
         "command": "aiRules.syncClineWorkspace",
-        "title": "AI Rulebook: Sync bundled rules to Cline (.clinerules/ai-rules)",
+        "title": "AI Rulebook: Sync core rule to Cline",
         "category": "AI Rulebook"
       },
       {
-        "command": "aiRules.showPackStatus",
-        "title": "AI Rulebook: Show active rules (green = active)",
+        "command": "aiRules.showCoreStatus",
+        "title": "AI Rulebook: Show core rule status",
         "category": "AI Rulebook"
       },
       {
-        "command": "aiRules.hideActiveRules",
-        "title": "AI Rulebook: Hide active rules (no green)",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.toggleIndividualRule",
-        "title": "AI Rulebook: Enable or disable a single rule…",
+        "command": "aiRules.hideRuleColors",
+        "title": "AI Rulebook: Hide rule colors",
         "category": "AI Rulebook"
       },
       {
         "command": "aiRules.resetWorkspaceRulesToDefaults",
-        "title": "AI Rulebook: Reset workspace rules folder to defaults…",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.modePlan",
-        "title": "AI Rulebook: Mode — Plan (architect role, no test rules)",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.modeBuild",
-        "title": "AI Rulebook: Mode — Build (developer role, no test rules)",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.modeTest",
-        "title": "AI Rulebook: Mode — Test (tester role + all test rules)",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.modeLowToken",
-        "title": "AI Rulebook: Mode — Low token (minimal rules + dense handoff)",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.modeRole",
-        "title": "AI Rulebook: Mode — Role… (pick a single role to frame replies)",
+        "title": "AI Rulebook: Reset core rule to default…",
         "category": "AI Rulebook"
       },
       {
@@ -130,18 +85,6 @@
         "command": "aiRules.revealRuleFile",
         "title": "AI Rulebook: Open rule file",
         "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.enableFolder",
-        "title": "AI Rulebook: Enable every rule in this folder",
-        "category": "AI Rulebook",
-        "icon": "$(check-all)"
-      },
-      {
-        "command": "aiRules.disableFolder",
-        "title": "AI Rulebook: Disable every rule in this folder",
-        "category": "AI Rulebook",
-        "icon": "$(close-all)"
       }
     ],
     "viewsContainers": {
@@ -157,7 +100,7 @@
       "aiRulesSidebar": [
         {
           "id": "aiRules.rulesTree",
-          "name": "Rules",
+          "name": "Core Rule",
           "icon": "$(checklist)",
           "contextualTitle": "AI Rulebook"
         }
@@ -166,44 +109,19 @@
     "menus": {
       "view/title": [
         {
-          "command": "aiRules.modePlan",
-          "when": "view == aiRules.rulesTree",
-          "group": "navigation@1"
-        },
-        {
-          "command": "aiRules.modeBuild",
-          "when": "view == aiRules.rulesTree",
-          "group": "navigation@2"
-        },
-        {
-          "command": "aiRules.modeTest",
-          "when": "view == aiRules.rulesTree",
-          "group": "navigation@3"
-        },
-        {
-          "command": "aiRules.modeLowToken",
-          "when": "view == aiRules.rulesTree",
-          "group": "navigation@4"
-        },
-        {
-          "command": "aiRules.modeRole",
-          "when": "view == aiRules.rulesTree",
-          "group": "navigation@5"
-        },
-        {
           "command": "aiRules.refreshTree",
           "when": "view == aiRules.rulesTree",
           "group": "navigation@9"
         },
         {
-          "command": "aiRules.enableAllWorkspace",
+          "command": "aiRules.enableCoreWorkspace",
           "when": "view == aiRules.rulesTree",
-          "group": "1_bulk@1"
+          "group": "1_state@1"
         },
         {
-          "command": "aiRules.disableAllWorkspace",
+          "command": "aiRules.disableCoreWorkspace",
           "when": "view == aiRules.rulesTree",
-          "group": "1_bulk@2"
+          "group": "1_state@2"
         },
         {
           "command": "aiRules.installWorkspace",
@@ -216,46 +134,51 @@
           "group": "2_workspace@2"
         },
         {
-          "command": "aiRules.showPackStatus",
+          "command": "aiRules.showCoreStatus",
           "when": "view == aiRules.rulesTree",
           "group": "3_inspect@1"
         },
         {
-          "command": "aiRules.hideActiveRules",
+          "command": "aiRules.hideRuleColors",
           "when": "view == aiRules.rulesTree",
           "group": "3_inspect@2"
         }
-      ],
-      "view/item/context": [
-        {
-          "command": "aiRules.enableFolder",
-          "when": "view == aiRules.rulesTree && viewItem == aiRulesFolder",
-          "group": "inline@1"
-        },
-        {
-          "command": "aiRules.disableFolder",
-          "when": "view == aiRules.rulesTree && viewItem == aiRulesFolder",
-          "group": "inline@2"
-        },
-        {
-          "command": "aiRules.enableFolder",
-          "when": "view == aiRules.rulesTree && viewItem == aiRulesFolder",
-          "group": "1_bulk@1"
-        },
-        {
-          "command": "aiRules.disableFolder",
-          "when": "view == aiRules.rulesTree && viewItem == aiRulesFolder",
-          "group": "1_bulk@2"
-        }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "aiRules.rulesTree",
+        "contents": "Open a project folder to install and manage its core AI rule.\n[Open Folder](command:workbench.action.files.openFolder)",
+        "when": "workspaceFolderCount == 0"
+      }
+    ],
+    "colors": [
+      {
+        "id": "aiRulebook.activeForeground",
+        "description": "Foreground color for the enabled core rule.",
+        "defaults": {
+          "dark": "#3FB950",
+          "light": "#1A7F37",
+          "highContrast": "#2EA043"
+        }
+      },
+      {
+        "id": "aiRulebook.inactiveForeground",
+        "description": "Foreground color for the disabled core rule.",
+        "defaults": {
+          "dark": "#8B949E",
+          "light": "#656D76",
+          "highContrast": "#A5A5A5"
+        }
+      }
+    ],
     "configuration": {
       "title": "AI Rulebook",
       "properties": {
         "aiRules.autoInstallOnOpenWorkspace": {
           "type": "boolean",
           "default": true,
-          "description": "When opening a workspace that has no .cursor/rules/ai-rules folder yet, install the bundled rule pack automatically. Existing rules folders are never overwritten."
+          "description": "When opening a workspace that has no .cursor/rules/ai-rules folder yet, install the bundled core rule automatically. Existing rules folders are never overwritten."
         },
         "aiRules.installCursorRulesFolder": {
           "type": "string",
@@ -285,7 +208,7 @@
         "aiRules.autoSyncClineWhenInstalled": {
           "type": "boolean",
           "default": true,
-          "description": "When Cline is installed, automatically mirror bundled .mdc rules into .clinerules/ai-rules/ after install / reset / copy-from-global (and when Cline is first detected)."
+          "description": "When Cline is installed, automatically mirror core.mdc into .clinerules/ai-rules/ after install or reset and when Cline is first detected."
         }
       }
     }
@@ -293,9 +216,11 @@
   "scripts": {
     "sync-bundled": "node scripts/sync-bundled.mjs",
     "verify:bundled": "node scripts/verify-bundled.mjs",
-    "compile": "tsc -p ./",
+    "clean": "node -e \"require('node:fs').rmSync('out', { recursive: true, force: true })\"",
+    "compile": "npm run clean && tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node --test tests/*.test.mjs",
+    "test": "npm run compile && npm run verify:bundled && node --test tests/*.test.mjs",
+    "test:coverage": "npm run compile && npm run verify:bundled && node --test --experimental-test-coverage tests/*.test.mjs",
     "vscode:prepublish": "npm run sync-bundled && npm run verify:bundled && npm run compile",
     "package": "vsce package"
   },

@@ -1,8 +1,0 @@
----
-description: Threat-first—auth, supply chain, crypto, residual risk
-alwaysApply: false
----
-
-# Audience: security
-
-Treat inputs, deps, permissions as threat surface. STRIDE / OWASP framing. Default mentions of auth/authz/secrets/crypto/supply chain. Defense in depth; state residual risk and monitoring. Cite CVE/CWE/advisories when useful.

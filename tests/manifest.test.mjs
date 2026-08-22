@@ -5,7 +5,7 @@ import * as path from "node:path";
 import test, { describe } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { listBundledMdcs, readBundleManifest } from "../out/manifest.js";
+import { readBundleManifest } from "../out/manifest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -18,15 +18,19 @@ async function writeExtensionRoot(manifest) {
 }
 
 describe("readBundleManifest (shipped pack)", () => {
-  test("loads the repo bundled manifest and lists only .mdc files", () => {
+  test("loads the single-core bundled manifest", () => {
     const manifest = readBundleManifest(repoRoot);
     assert.equal(manifest.version, 1);
-    assert.ok(manifest.files.includes("ABOUT_RULES.md"));
-    assert.ok(manifest.files.includes("coding-rules/write-clean-code.mdc"));
-    const mdcs = listBundledMdcs(manifest);
-    assert.ok(mdcs.every((f) => f.endsWith(".mdc")));
-    assert.ok(!mdcs.includes("ABOUT_RULES.md"));
-    assert.equal(mdcs.length, manifest.files.filter((f) => f.endsWith(".mdc")).length);
+    assert.deepEqual(manifest.files, ["core.mdc"]);
+  });
+
+  test("ships the core rule as always-on", async () => {
+    const core = await fs.readFile(
+      path.join(repoRoot, "bundled", "ai-rules", "core.mdc"),
+      "utf8"
+    );
+
+    assert.match(core, /^---\n(?:[^\n]*\n)*alwaysApply: true\n(?:[^\n]*\n)*---\n/);
   });
 });
 
@@ -69,7 +73,7 @@ describe("readBundleManifest validation", () => {
 
   test("rejects a traversal entry", async () => {
     const dir = await writeExtensionRoot(
-      JSON.stringify({ version: 1, files: ["coding-rules/ok.mdc", "../escape.mdc"] })
+      JSON.stringify({ version: 1, files: ["core.mdc", "../escape.mdc"] })
     );
     try {
       assert.throws(() => readBundleManifest(dir), /unsafe entry/);
@@ -80,15 +84,14 @@ describe("readBundleManifest validation", () => {
 
   test("accepts a minimal valid manifest", async () => {
     const dir = await writeExtensionRoot(
-      JSON.stringify({ version: 1, files: ["ABOUT_RULES.md", "coding-rules/x.mdc"] })
+      JSON.stringify({ version: 1, files: ["core.mdc"] })
     );
     try {
       const manifest = readBundleManifest(dir);
       assert.deepEqual(manifest, {
         version: 1,
-        files: ["ABOUT_RULES.md", "coding-rules/x.mdc"],
+        files: ["core.mdc"],
       });
-      assert.deepEqual(listBundledMdcs(manifest), ["coding-rules/x.mdc"]);
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }

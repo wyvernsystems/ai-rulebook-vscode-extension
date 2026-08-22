@@ -56,8 +56,8 @@ export function assertContainedPath(base: string, candidate: string, label: stri
 
 /**
  * Returns true when `target`'s resolved path ends with `expectedSegments` in
- * order. Used to gate destructive operations on `.cursor/rules/ai-rules` and
- * the global mirror so a corrupted constant can't widen the blast radius.
+ * order. Used to gate destructive operations on `.cursor/rules/ai-rules` so a
+ * corrupted constant can't widen the blast radius.
  */
 export function endsWithPathSegments(target: string, expectedSegments: readonly string[]): boolean {
   const resolved = path.resolve(target).split(path.sep).filter((s) => s.length > 0);

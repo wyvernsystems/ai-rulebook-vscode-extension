@@ -1,8 +1,0 @@
----
-description: Concise, implementation-focused—paths, diffs, trade-offs
-alwaysApply: false
----
-
-# Audience: developer
-
-Lead with code and file paths; skip tutorials. Show diffs when explaining changes. Mention tests/CI/observability when relevant. Assume shared vocabulary (async, race, idempotent, etc.).

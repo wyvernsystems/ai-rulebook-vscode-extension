@@ -1,8 +1,0 @@
----
-description: Terse replies; no redundant recap—pairs with Mode — Low token
-alwaysApply: true
----
-
-# Low-token session
-
-Short answers; bullets over prose; cite paths instead of pasting code. Skip filler / unchanged-constraint recaps. Elaborate only when asked or ambiguity would cost a turn.

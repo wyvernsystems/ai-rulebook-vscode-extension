@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { UI_COLORS } from "./uiPresentation";
 
 const RULES_PATH_SEGMENT = `${path.sep}.cursor${path.sep}rules${path.sep}ai-rules${path.sep}`;
 
@@ -48,14 +49,14 @@ export class WorkspaceRuleFileColorer implements vscode.FileDecorationProvider {
     }
     if (fsPath.endsWith(".mdc")) {
       return {
-        color: new vscode.ThemeColor("testing.iconPassed"),
-        tooltip: "AI Rule — active (loaded by Cursor)",
+        color: new vscode.ThemeColor(UI_COLORS.active),
+        tooltip: "AI Rulebook — enabled and loaded by Cursor",
       };
     }
     if (fsPath.endsWith(".mdc.disabled")) {
       return {
-        color: new vscode.ThemeColor("disabledForeground"),
-        tooltip: "AI Rule — disabled (`.mdc.disabled` on disk)",
+        color: new vscode.ThemeColor(UI_COLORS.inactive),
+        tooltip: "AI Rulebook — disabled and not loaded by Cursor",
       };
     }
     return undefined;

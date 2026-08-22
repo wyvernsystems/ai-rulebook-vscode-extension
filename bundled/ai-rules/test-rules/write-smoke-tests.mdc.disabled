@@ -1,8 +1,0 @@
----
-description: Few checks that the app boots and critical paths still work
-alwaysApply: false
----
-
-# Smoke tests
-
-Catastrophic breakage only—seconds to run. Critical happy paths (health, login, create, main UI). Every PR before heavy suites; fail fast. Light asserts (HTTP OK, element visible). Tight suite—coverage not the goal. Failures block the build.

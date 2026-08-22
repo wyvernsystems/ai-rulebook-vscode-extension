@@ -1,33 +1,6 @@
 {
   "version": 1,
   "files": [
-    "ABOUT_RULES.md",
-    "coding-rules/organize-repository-by-feature.mdc",
-    "coding-rules/prefer-lts-stable-runtimes-and-libraries.mdc",
-    "coding-rules/remove-dead-code-and-unused-files.mdc",
-    "coding-rules/reuse-code-before-duplicating.mdc",
-    "coding-rules/secure-code-data-and-dependencies.mdc",
-    "coding-rules/write-clean-code.mdc",
-    "context-rules/dense-session-handoff-context.mdc",
-    "context-rules/low-token-session-habits.mdc",
-    "documentation-rules/append-and-deduplicate-requirements.mdc",
-    "documentation-rules/update-changelog-for-notable-changes.mdc",
-    "documentation-rules/use-this-format-for-markdown-files.mdc",
-    "role-rules/role-architect.mdc",
-    "role-rules/role-beginner.mdc",
-    "role-rules/role-cyber-expert.mdc",
-    "role-rules/role-developer.mdc",
-    "role-rules/role-end-user.mdc",
-    "role-rules/role-expert.mdc",
-    "role-rules/role-product-manager.mdc",
-    "role-rules/role-tester.mdc",
-    "rules-for-rules/evolve-rules-when-codebase-patterns-change.mdc",
-    "rules-for-rules/state-active-project-rules-in-prompt-response.mdc",
-    "rules-for-rules/write-cursor-rules-for-this-project.mdc",
-    "test-rules/write-end-to-end-tests.mdc",
-    "test-rules/write-integration-tests.mdc",
-    "test-rules/write-regression-tests.mdc",
-    "test-rules/write-smoke-tests.mdc",
-    "test-rules/write-unit-tests.mdc"
+    "core.mdc"
   ]
 }

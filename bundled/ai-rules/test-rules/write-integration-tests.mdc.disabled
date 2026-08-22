@@ -1,8 +1,0 @@
----
-description: Real wires—DB, HTTP, queue—with isolated environments
-alwaysApply: false
----
-
-# Integration tests
-
-Exercise real module boundaries (HTTP, DB, queue, FS, SDKs). Ephemeral envs; reset between tests; no order dependence. Assert outcomes, not internal call counts. Stub only what can’t run locally. Tag/mark slow suites.

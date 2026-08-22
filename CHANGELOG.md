@@ -10,8 +10,29 @@ All notable changes to this project are documented here. The format follows
 
 - **Tests**: `tests/safePaths.test.mjs`, `tests/manifest.test.mjs`, and
   `tests/rulesOperations.test.mjs` cover path containment, manifest
-  validation, rule toggle/install/reset, global-mirror guards, and Cline
-  flattening (`npm test`).
+  validation, core-rule toggle/install/reset, and Cline mirroring (`npm test`).
+
+### Changed
+
+- **Sidebar presentation refined.** The core rule uses a readable label,
+  clearer tooltip, and consistent Enabled / Disabled wording. An
+  empty-workspace welcome action opens a project folder.
+- **Theme-aware UI palette.** New configurable enabled and disabled color
+  tokens keep sidebar and Explorer styling consistent across light, dark, and
+  high-contrast themes.
+- **Rule pack compressed to one file.** `core.mdc` is always on and combines
+  stable dependencies, reuse, feature organization, unit tests and coverage,
+  project-document upkeep, and Markdown conventions.
+- **Clean compilation.** `npm run compile` removes stale `out/` files before
+  rebuilding so deleted modules cannot enter the VSIX.
+
+### Removed
+
+- Role, mode, testing, documentation, context, security, and rule-authoring
+  rule files and their mode commands. Their essential constraints now live in
+  `core.mdc`.
+- Empty category folders, redundant global-mirror and one-item toggle commands,
+  and the duplicated `ABOUT_RULES.md`.
 
 ## [1.4.0] - 2026-05-05
 

@@ -1,9 +1,7 @@
 # AI Rulebook — Cursor / VS Code extension
 
-**One-line:** This extension drops a curated set of AI agent **rules** into your
-project so Cursor (and Cline) reply more consistently — write cleaner code,
-keep docs current, frame answers for the right audience, and write proper
-tests when you ask for them.
+**One-line:** This extension installs one compact, always-on engineering rule
+for Cursor and Cline.
 
 - **Display name:** AI Rulebook
 - **Package id:** `WyvernSystemsLLC.ai-rulebook`
@@ -13,86 +11,66 @@ tests when you ask for them.
 
 ## What are AI rules and why use them?
 
-A "rule" is a short Markdown file you give the AI assistant. It tells the
-assistant **how you want it to behave** in this project — coding style,
-security defaults, doc-keeping habits, who the answer is for, what to test,
-etc.
+A rule is a short Markdown file that tells an AI assistant how to work in a
+project.
 
 Cursor and Cline both load rules automatically when you chat with them, so the
 assistant follows your team's conventions without you having to remind it
 every message.
 
-This extension ships **27 ready-made rules** grouped into 6 folders, plus a
-sidebar to turn them on and off, plus **modes** (Plan / Build / Test / Low
-token / Role…) that flip presets in one click. You don't have to write any
-rules yourself to get value — install, click "Install / update rules in
-workspace", and start chatting.
+This extension ships one deliberately compressed rule covering stable
+dependencies, reuse, feature organization, unit tests and coverage, core
+project documents, and Markdown conventions.
 
 ```text
 .cursor/rules/ai-rules/
-├── ABOUT_RULES.md
-├── coding-rules/            ← how to write and ship code
-├── context-rules/           ← dense handoff for new chats; low-token habits
-├── documentation-rules/     ← how to maintain docs and changelogs
-├── role-rules/              ← how to frame replies for a given audience
-├── rules-for-rules/         ← how the rule pack is authored and announced
-└── test-rules/              ← how to design and write tests
+└── core.mdc
 ```
 
 ## Quickstart
 
 1. Install **AI Rulebook** in Cursor or VS Code.
 2. Open the project you want the rules to apply to. The first time the
-   extension sees a project, it drops the bundled rule pack into
-   `.cursor/rules/ai-rules/` and starts it in **Build mode** (developer role
-   on; tests off; `rules-for-rules/*` and several heavy `coding-rules/*` off for
-   a lighter default). Existing `.cursor/rules/ai-rules/` folders are never
-   overwritten.
+   extension sees a project, it installs `core.mdc` under
+   `.cursor/rules/ai-rules/`. Existing rule folders are never overwritten.
 3. Click the checklist icon in the **activity bar** (left side) to open the
    **AI Rulebook** sidebar.
-4. Toggle individual rules with the checkboxes in the sidebar, or pick a
-   preset with the **Mode — Plan / Build / Test / Low token / Role…** buttons
-   at the top of the sidebar.
-5. Start chatting. The AI now follows the rules you have turned on.
+4. Use the checkbox to enable or disable the core rule.
+5. Start chatting.
 
 To opt out of the first-time auto-install, set
 `aiRules.autoInstallOnOpenWorkspace` to `false` and run
-**`AI Rulebook: Install / update rules in workspace`** when you want it.
+**`AI Rulebook: Install / update core rule`** when you want it.
 
-## Sidebar tree view — turn rules on and off
+## Sidebar tree view — turn the rule on or off
 
-The **AI Rulebook** sidebar (activity-bar icon, looks like a checklist) is the
-primary place to enable / disable rules. It shows every shipped rule grouped
-by subfolder and uses color so the on / off state is obvious at a glance:
+The **AI Rulebook** sidebar is the primary place to enable or disable the core
+rule. Color makes its state obvious:
 
-- **Green label + filled circle icon** — rule is active (`<name>.mdc` on
+- **Green label + filled circle icon** — rule is enabled (`<name>.mdc` on
   disk, loaded by Cursor).
 - **Dimmed gray label + empty circle icon** — rule is off
   (`<name>.mdc.disabled` on disk, ignored by Cursor).
+
+The palette adapts to light, dark, and high-contrast themes through the
+`aiRulebook.activeForeground` and `aiRulebook.inactiveForeground` workbench
+color tokens.
 
 What you can do from the sidebar:
 
 | Where | Action |
 |-------|--------|
-| Title bar buttons (top of the view) | One-click **Mode — Plan / Build / Test / Low token / Role…** presets, plus a **Refresh** icon. The overflow menu (`…`) holds bulk actions: Enable all, Disable all, Install / update, Reset, Show active rules. |
-| **Folder row** (e.g. `coding-rules/`) | Right-click → **Enable every rule in this folder** or **Disable every rule in this folder**. Inline check-all / close-all icons appear on hover. |
+| Title bar | Refresh the view. The overflow menu (`…`) holds enable, disable, install, reset, and status actions. |
 | **Rule row checkbox** | Click the checkbox to flip the rule on / off (renames `<name>.mdc` ↔ `<name>.mdc.disabled`). |
 | **Rule row label** | Click the rule name to open the `.mdc` file in the editor. |
-| **`Show active rules` command** | Opens / focuses the sidebar so you can scan the colored on / off state, and writes a plain-text snapshot to **Output → AI Rulebook** for logging. |
-
-Switching modes applies each preset’s enable/disable lists (Build turns off
-several coding rules and all `rules-for-rules/*`). Plan and Test restore those
-when you leave Build. Manual checkbox changes persist until the next mode
-switch replaces them.
+| **`Show core rule status` command** | Opens / focuses the sidebar and writes its state to **Output → AI Rulebook**. |
 
 ### Same colors in the workbench Explorer
 
 The same color scheme also applies to rule files in VS Code's built-in
-**Explorer** view: any `<name>.mdc` under `.cursor/rules/ai-rules/` shows up
-green, and any `<name>.mdc.disabled` shows up muted gray. So you can browse
-your rules folder like a normal folder and still see at a glance which rules
-are active. Set `aiRules.colorRulesInExplorer` to `false` (or run **`AI
-Rules: Hide active rules`**) to opt out; **`AI Rulebook: Show active rules`**
+**Explorer** view: `core.mdc` shows green and `core.mdc.disabled` shows muted
+gray. Set `aiRules.colorRulesInExplorer` to `false` (or run **`AI Rulebook:
+Hide rule colors`**) to opt out; **`AI Rulebook: Show core rule status`**
 turns it back on. The sidebar tree always shows on / off colors regardless
 of this setting.
 
@@ -104,119 +82,65 @@ Every command lives under the **AI Rulebook:** prefix in the command palette.
 
 | Command | Plain English |
 |---------|---------------|
-| Install / update rules in workspace | Copies all bundled rules into `.cursor/rules/ai-rules/`. The `evolve-rules` rule starts off unless it was already on. Auto-mirrors to Cline if Cline is installed. |
-| Reset workspace rules folder to defaults… | Deletes the workspace rules folder and replaces it with the bundled defaults. Removes any extra rules you (or the AI) added. |
-| Sync bundled rules to Cline (`.clinerules/ai-rules`) | Manually mirrors the bundled `.mdc` rules into `.clinerules/ai-rules/` (the format Cline reads). |
+| Install / update core rule | Copies `core.mdc` into `.cursor/rules/ai-rules/`. Auto-mirrors to Cline if Cline is installed. |
+| Reset core rule to default… | Replaces the workspace rules folder with `core.mdc`, removing extra files. |
+| Sync core rule to Cline | Mirrors `core.mdc` into `.clinerules/ai-rules/`. |
 
-### Turn rules on or off
-
-| Command | Plain English |
-|---------|---------------|
-| Enable all rules (workspace) | Turns every bundled rule **on** in this project. |
-| Disable all rules (workspace) | Turns every bundled rule **off** in this project (renames to `.mdc.disabled`). |
-| Enable or disable a single rule… | Pops up a picker for one rule and flips it on or off. |
-| Enable every rule in this folder | (Sidebar) Turns every rule under the picked subfolder on. |
-| Disable every rule in this folder | (Sidebar) Turns every rule under the picked subfolder off. |
-
-### Modes
+### Turn the rule on or off
 
 | Command | Plain English |
 |---------|---------------|
-| Mode — Plan | Architect on; other roles + tests off; full coding + `rules-for-rules/*` on. |
-| Mode — Build | Developer on; other roles + tests off; `rules-for-rules/*` off; secure-code coding rule off (lightweight). |
-| Mode — Test | Tester on; all `test-rules/*` on; other roles off; full coding + `rules-for-rules/*` on. |
-| Mode — Low token | Only minimal rules (incl. docs) (see `ABOUT_RULES.md`) for long, token-efficient sessions. |
-| Mode — Role… | Pick a single role; the others get turned off. |
-
-### Global mirror (cross-project)
-
-The "global mirror" is a per-extension copy under VS Code / Cursor's global
-storage. You can populate it once and then push it into any project.
-
-| Command | Plain English |
-|---------|---------------|
-| Enable all rules (global mirror) | Refreshes the extension's global mirror from the bundle. |
-| Disable all rules (global mirror) | Removes the global mirror. |
-| Copy global mirror into workspace | Pushes the global mirror into the current project's rules folder. |
+| Enable core rule (workspace) | Enables `core.mdc`. |
+| Disable core rule (workspace) | Renames `core.mdc` to `core.mdc.disabled`. |
 
 ### Inspect / refresh
 
 | Command | Plain English |
 |---------|---------------|
-| Show active rules (green = active) | Turns the Explorer green tint on (if you'd hidden it), focuses the AI Rulebook sidebar, and writes a plain-text snapshot to **Output → AI Rulebook**. |
-| Hide active rules (no green) | Turns the Explorer green tint off (sets `aiRules.colorRulesInExplorer` to `false` at the user level). The sidebar tree's colors are unaffected. |
+| Show core rule status | Turns Explorer coloring on, focuses the sidebar, and writes the state to **Output → AI Rulebook**. |
+| Hide rule colors | Turns Explorer rule coloring off. The sidebar colors are unaffected. |
 | Refresh sidebar | Re-reads the rules folder from disk and redraws the sidebar tree. |
 | Open rule file | Opens a specific `.mdc` in the editor (used by the sidebar tree). |
-
-## Modes
-
-One-click presets. **Build** is the lightweight everyday default; **Plan** and
-**Test** turn full coding + meta rules back on; **Low token** keeps only a
-minimal subset for long, token-efficient sessions; **Role…** picks one role.
-
-Full per-mode rule lists live in
-[`bundled/ai-rules/ABOUT_RULES.md`](./bundled/ai-rules/ABOUT_RULES.md). Manual
-sidebar/command-palette toggles persist until the next mode switch replaces
-them.
 
 ## Settings
 
 | Setting | Default | Effect |
 |---------|---------|--------|
-| `aiRules.autoInstallOnOpenWorkspace` | `true` | When you open a workspace that has no `.cursor/rules/ai-rules/` folder yet, install the bundled rule pack automatically. Never overwrites an existing folder. |
+| `aiRules.autoInstallOnOpenWorkspace` | `true` | When you open a workspace that has no `.cursor/rules/ai-rules/` folder yet, install the bundled core rule automatically. Never overwrites an existing folder. |
 | `aiRules.installCursorRulesFolder` | `"auto"` | Policy for the `.cursor/rules/ai-rules/` auto-install. `"auto"` only creates it when the host is Cursor, `"always"` creates it in any host (e.g. you're committing the folder for Cursor-using teammates while editing in plain VS Code), `"never"` skips it entirely. Manual install / reset commands ignore this. |
 | `aiRules.colorRulesInExplorer` | `true` | Tint rule files in VS Code's Explorer: `.mdc` (active) appears green and `.mdc.disabled` (off) appears muted gray, anywhere under `.cursor/rules/ai-rules/`. |
 | `aiRules.promptInstallOnUpdate` | `true` | When the extension version changes, ask whether to refresh workspace rules from the bundled copy. |
-| `aiRules.autoSyncClineWhenInstalled` | `true` | If Cline is installed, also mirror bundled `.mdc` rules into `.clinerules/ai-rules/` whenever rules change. Independent of `installCursorRulesFolder` — Cline users on plain VS Code still get the Cline mirror without the `.cursor/` folder. |
+| `aiRules.autoSyncClineWhenInstalled` | `true` | If Cline is installed, mirror `core.mdc` into `.clinerules/ai-rules/` whenever it changes. Independent of `installCursorRulesFolder` — Cline users on plain VS Code still get the Cline mirror without the `.cursor/` folder. |
 
-## Every rule that ships with this extension
+## Shipped rule
 
-The shipped pack lives under `.cursor/rules/ai-rules/` (source) and
-`bundled/ai-rules/` (VSIX copy). For each rule's purpose, scope, mode
-behavior, and whether it's on by default, see
-[`bundled/ai-rules/ABOUT_RULES.md`](./bundled/ai-rules/ABOUT_RULES.md).
+`core.mdc` is always applied while enabled. Its source lives under
+`.cursor/rules/ai-rules/`; the VSIX copy lives under `bundled/ai-rules/`.
 
 ## Limitations — read this before you blame the rules
 
 Rules are **instructions to the model**, not enforcement. The assistant
 chooses how to weigh them on every reply. In practice this means:
 
-- **Context is limited.** Every active rule eats space in the model's context
-  window. If you turn on all shipped rules **and** include large files **and** a long
-  chat history, the model may quietly drop or compress some rules. Symptom:
-  rules you turned on don't appear to fire.
-- **Some rules are stronger than others.** Always-on rules are loaded every
-  turn; glob-scoped rules only when matching files are open; `@-mentioned`
-  rules only on the turn you mention them. If a rule isn't firing, check the
-  scope.
+- **Context is limited.** Rules, files, and chat history share the model's
+  context window. The bundled rule is compressed to minimize that cost.
 - **Models drift between turns.** A rule may apply on the first reply and not
-  on the third. Re-mention it (`@write-clean-code`) or restate the relevant
-  expectation.
+  on the third. Re-mention `@core` or restate the relevant expectation.
 - **Different products read rules differently.** Cursor and Cline don't have
   identical engines; Cline mirrors are best-effort.
-- **The "Active project rules" header is not guaranteed.** Cursor depends on
-  the model to honor `state-active-project-rules-in-prompt-response.mdc`. If
-  the model skips it, mention `@state-active-project-rules-in-prompt-response`
-  once in the chat.
 
 **Practical advice:**
 
-- Don't enable everything by default. Use **Plan / Build / Test / Low token**
-  to match the work you're actually doing.
-- For a big or complex task, turn off the rules you don't need that turn.
 - If you want a rule to fire **definitely**, `@-mention` it in your message.
 - If a rule keeps getting ignored, shorten it. Compressed rules survive
   truncation better.
 
 ## Security model
 
-This extension only writes inside three well-known locations:
+This extension only writes inside two well-known locations:
 
 - the open workspace folder, under `.cursor/rules/ai-rules/` and (if Cline is
   installed) `.clinerules/ai-rules/`;
-- the extension's **global storage** under
-  `<globalStorage>/ai-rules-mirror/ai-rules/` — used by the global mirror
-  commands;
 - nothing outside those paths.
 
 Defenses applied:
@@ -229,9 +153,8 @@ Defenses applied:
   a base directory re-checks that the resolved path stays inside that base.
   Out-of-tree paths throw before any filesystem call.
 - **Destructive operations are gated by an explicit suffix check.** The
-  workspace rules folder must end with `.cursor/rules/ai-rules`; the global
-  mirror with `ai-rules-mirror/ai-rules`. A misconfigured constant cannot
-  widen the blast radius of `rm -rf`.
+  workspace rules folder must end with `.cursor/rules/ai-rules`; a
+  misconfigured constant cannot widen the blast radius of `rm -rf`.
 - **No symlinks during recursive copies.** The `fs.cp` calls used to mirror
   the bundle filter out symbolic links; the directory walker skips them too.
 - **No network access.** The extension never makes outbound HTTP calls.
@@ -282,8 +205,5 @@ follow [their publishing guide](https://github.com/eclipse/openvsx/wiki/Publishi
 
 ## Notes
 
-- Cursor **user rules** (app-wide) still live in **Cursor Settings → Rules**;
-  this extension's "global mirror" is separate per-extension storage unless
-  you copy it into a workspace.
-- Cline may interpret YAML (`globs` vs `paths`) differently from Cursor; treat
+- Cline may interpret YAML differently from Cursor; treat
   Cline output as best-effort.

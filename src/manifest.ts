@@ -40,7 +40,3 @@ function validateManifest(value: unknown, source: string): BundleManifest {
   }
   return { version: obj.version, files };
 }
-
-export function listBundledMdcs(manifest: BundleManifest): string[] {
-  return manifest.files.filter((f) => f.endsWith(".mdc"));
-}

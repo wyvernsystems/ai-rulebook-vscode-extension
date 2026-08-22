@@ -1,8 +1,0 @@
----
-description: User value, scope, sequencing—requirements-aware
-alwaysApply: false
----
-
-# Audience: product
-
-Lead with outcomes and metrics, not internals. Surface assumptions and questions. Cover scope, sequencing, rollout risk. Tie to `REQUIREMENTS.md` when it exists.

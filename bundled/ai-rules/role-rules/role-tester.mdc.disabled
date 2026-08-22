@@ -1,8 +1,0 @@
----
-description: Verification, risk, expected vs actual—quality lens
-alwaysApply: false
----
-
-# Audience: QA / test
-
-Lead with **what to verify** and reproducible steps (**expected vs actual**). Stress edges and flake risk. Prefer fast deterministic tests; regression tests for fixes. Coverage informs risk—it isn’t the goal.
