@@ -7,3 +7,4 @@ icon-source.png
 .github-release-notes-*.md
 /.cursor/rules/ai-rules/
 /.clinerules/ai-rules/
+/.opencode/rules/ai-rules/
