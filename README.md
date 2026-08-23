@@ -12,8 +12,9 @@ docs, Markdown, and Git. A sidebar lets you turn each rule on and off.
 - **`code.mdc`** — reuse existing helpers, organize by feature, choose safe
   dependencies, validate input, never log or commit secrets, wrap errors.
 - **`tests.mdc`** — write failing tests for the requirement first, then the
-  code; add or update unit tests for behavior changes; never weaken a test to
-  make it pass; report every failing or unrun check.
+  code; add or update unit tests for behavior changes; run the lint and type
+  checks the project already has; never weaken a test to make it pass; report
+  every failing or unrun check.
 - **`docs.mdc`** — update `README.md`, `REQUIREMENTS.md`, `DEPLOY.md`, and
   `CHANGELOG.md` only when their trigger applies.
 - **`markdown.mdc`** — one H1, no skipped heading levels, `-` bullets,
@@ -68,7 +69,7 @@ Install the same VSIX in Cursor — it is a VS Code-compatible host.
 1. Install the AI Rulebook extension in VS Code or Cursor:
 
    ```bash
-   code --install-extension ai-rulebook-2.0.0.vsix
+   code --install-extension ai-rulebook-2.5.0.vsix
    ```
 
    or Extensions panel → `...` → **Install from VSIX...**.
@@ -120,6 +121,8 @@ Run `npm run sync-bundled` after editing the source rule files.
 Source rules under `.cursor/rules/ai-rules/` hold the `{{TEST_COMMAND}}`
 token verbatim — they are the template the extension renders from, so this
 repo's own working copy shows the token rather than a command.
+
+Cutting a release is documented in [DEPLOY.md](./DEPLOY.md).
 
 ## License
 

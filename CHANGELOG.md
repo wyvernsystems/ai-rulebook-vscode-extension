@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-08-23
+
 ### Added
 
 - **opencode support.** When the workspace shows evidence of opencode usage
@@ -51,6 +53,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **`tests.mdc` covers static checks, not just tests.** A new bullet requires
+  running the lint and type checks a project already has and fixing what the
+  change introduced, and forbids adding, configuring, or disabling a linter
+  the project does not already use. The rule previously banned suppressing a
+  lint rule without ever asking for one to be run. Phrasing is conditional on
+  existing tooling, so it stays a no-op in projects that have none and never
+  pushes an agent into the dependency and scope changes `code.mdc` and
+  `scope.mdc` prohibit.
 - **`markdown.mdc` is glob-scoped** to `**/*.{md,mdx}` instead of always-on.
   Its guidance only applies while editing Markdown, so it no longer consumes
   context on every other turn. The rule body keeps its "When editing `.md`
@@ -66,6 +76,13 @@ All notable changes to this project are documented here. The format follows
 - **`tests.mdc` no longer ships an unfilled placeholder.** Every installed
   copy previously told the agent to run the literal text
   `<your test command>`, which nothing substituted.
+
+### Documentation
+
+- **`DEPLOY.md`** documents the release process: prerequisites, the
+  versioning contract between `package.json`, `CHANGELOG.md`, and the git
+  tag, the build and publish checklist, hotfix and rollback guidance, and
+  what `.vscodeignore` lets into the VSIX.
 
 ## [2.0.0] - 2026-08-22
 
