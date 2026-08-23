@@ -77,6 +77,16 @@ describe("VS Code package contributions", () => {
     }
   });
 
+  test("disabled rule color defaults to red in every theme", () => {
+    const inactive = contributions.colors.find(
+      (color) => color.id === "aiRulebook.inactiveForeground"
+    );
+
+    assert.equal(inactive.defaults.dark, "#F85149");
+    assert.equal(inactive.defaults.light, "#CF222E");
+    assert.equal(inactive.defaults.highContrast, "#F85149");
+  });
+
   test("Cursor install policy contribution matches runtime-supported values", () => {
     const policy =
       contributions.configuration.properties["aiRules.installCursorRulesFolder"];
@@ -92,6 +102,7 @@ describe("VS Code package contributions", () => {
       "aiRules.colorRulesInExplorer",
       "aiRules.promptInstallOnUpdate",
       "aiRules.autoSyncClineWhenInstalled",
+      "aiRules.autoSyncOpencodeWhenInstalled",
     ];
 
     for (const settingId of booleanSettingIds) {

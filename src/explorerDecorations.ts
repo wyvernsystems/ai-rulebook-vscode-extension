@@ -2,7 +2,8 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { UI_COLORS } from "./uiPresentation";
 
-const RULES_PATH_SEGMENT = `${path.sep}.cursor${path.sep}rules${path.sep}ai-rules${path.sep}`;
+const CURSOR_RULES_SEGMENT = `${path.sep}.cursor${path.sep}rules${path.sep}ai-rules${path.sep}`;
+const OPENCODE_RULES_SEGMENT = `${path.sep}.opencode${path.sep}rules${path.sep}ai-rules${path.sep}`;
 
 const SETTING_ID = "colorRulesInExplorer";
 
@@ -12,10 +13,11 @@ function isEnabled(): boolean {
 }
 
 /**
- * Tints rule files green / muted gray in the workbench Explorer (and any
- * other view that shows real `file://` URIs) based on whether they live as
- * `<name>.mdc` (active) or `<name>.mdc.disabled` (off) under any workspace's
- * `.cursor/rules/ai-rules/` folder. Sibling to the sidebar tree's
+ * Tints rule files green / red in the workbench Explorer (and any other view
+ * that shows real `file://` URIs) based on whether they live as an active
+ * (`<name>.mdc` / `<name>.md`) or disabled (`<name>.mdc.disabled` /
+ * `<name>.md.disabled`) rule under any workspace's `.cursor/rules/ai-rules/`
+ * or `.opencode/rules/ai-rules/` folder. Sibling to the sidebar tree's
  * `RuleStatusDecorationProvider`, which works on synthetic URIs—this one
  * works on the actual files on disk so the same colors show up in the
  * project's file tree.
@@ -33,6 +35,16 @@ export class WorkspaceRuleFileColorer implements vscode.FileDecorationProvider {
     this._onDidChange.fire(uris ?? undefined);
   }
 
+  private static ownerFor(fsPath: string): "Cursor" | "opencode" | undefined {
+    if (fsPath.includes(CURSOR_RULES_SEGMENT)) {
+      return "Cursor";
+    }
+    if (fsPath.includes(OPENCODE_RULES_SEGMENT)) {
+      return "opencode";
+    }
+    return undefined;
+  }
+
   provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
     if (!isEnabled()) {
       return undefined;
@@ -44,19 +56,21 @@ export class WorkspaceRuleFileColorer implements vscode.FileDecorationProvider {
       return undefined;
     }
     const fsPath = uri.fsPath;
-    if (!fsPath.includes(RULES_PATH_SEGMENT)) {
+    const owner = WorkspaceRuleFileColorer.ownerFor(fsPath);
+    if (!owner) {
       return undefined;
     }
-    if (fsPath.endsWith(".mdc")) {
+    const activeSuffix = owner === "Cursor" ? ".mdc" : ".md";
+    if (fsPath.endsWith(activeSuffix)) {
       return {
         color: new vscode.ThemeColor(UI_COLORS.active),
-        tooltip: "AI Rulebook — enabled and loaded by Cursor",
+        tooltip: `AI Rulebook — enabled and loaded by ${owner}`,
       };
     }
-    if (fsPath.endsWith(".mdc.disabled")) {
+    if (fsPath.endsWith(`${activeSuffix}.disabled`)) {
       return {
         color: new vscode.ThemeColor(UI_COLORS.inactive),
-        tooltip: "AI Rulebook — disabled and not loaded by Cursor",
+        tooltip: `AI Rulebook — disabled and not loaded by ${owner}`,
       };
     }
     return undefined;

@@ -26,6 +26,7 @@ Module._load = function loadWithVscodeMock(request, parent, isMain) {
 const cursor = await import("../out/cursor.js");
 const cline = await import("../out/cline.js");
 const explorerDecorations = await import("../out/explorerDecorations.js");
+const opencode = await import("../out/opencode.js");
 const ruleStatusUi = await import("../out/ruleStatusUi.js");
 const sidebarTreeView = await import("../out/sidebarTreeView.js");
 const rulesOperations = await import("../out/rulesOperations.js");
@@ -143,6 +144,96 @@ describe("Cline detection", () => {
   });
 });
 
+describe("opencode detection and sync", () => {
+  const bundleDir = path.join(repoRoot, "bundled", "ai-rules");
+
+  test("shouldAutoSyncOpencode honors the setting and workspace evidence", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+    assert.equal(await opencode.shouldAutoSyncOpencode(root), false);
+
+    await writeFile(path.join(root, "AGENTS.md"), "# rules\n");
+    assert.equal(await opencode.shouldAutoSyncOpencode(root), true);
+
+    state.configuration.set("aiRules.autoSyncOpencodeWhenInstalled", false);
+    assert.equal(await opencode.shouldAutoSyncOpencode(root), false);
+  });
+
+  test("syncRulePackToOpencode writes stripped rules and creates the config", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+    const result = await opencode.syncRulePackToOpencode(root, bundleDir, RULE_FILES);
+
+    assert.equal(result, "created-config");
+    const mirror = path.join(root, ".opencode", "rules", "ai-rules", "code.md");
+    const body = await fs.readFile(mirror, "utf8");
+    assert.ok(body.length > 0);
+    assert.ok(!body.startsWith("---"));
+    const config = JSON.parse(
+      await fs.readFile(path.join(root, ".opencode", "opencode.json"), "utf8")
+    );
+    assert.deepEqual(config.instructions, [".opencode/rules/ai-rules/*.md"]);
+    assert.equal(
+      await fs.readFile(path.join(root, ".gitignore"), "utf8"),
+      `${rulesOperations.GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`
+    );
+  });
+
+  test("activate mirrors to opencode on a non-Cursor host with workspace evidence", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    await writeFile(path.join(workspaceRoot, "AGENTS.md"), "# rules\n");
+    const { context } = makeExtensionContext(repoRoot);
+
+    await extension.activate(context);
+
+    assert.equal(
+      await rulesOperations.pathExists(rulesOperations.workspaceRulesDir(workspaceRoot)),
+      false
+    );
+    assert.equal(
+      await rulesOperations.pathExists(
+        path.join(workspaceRoot, ".opencode", "rules", "ai-rules", "code.md")
+      ),
+      true
+    );
+    const config = JSON.parse(
+      await fs.readFile(path.join(workspaceRoot, ".opencode", "opencode.json"), "utf8")
+    );
+    assert.deepEqual(config.instructions, [".opencode/rules/ai-rules/*.md"]);
+  });
+
+  test("syncOpencodeWorkspace warns when the opencode config cannot be parsed", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    await writeFile(path.join(workspaceRoot, "opencode.json"), "{\n  instructions: [\n");
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+
+    await state.registeredCommands.get("aiRules.syncOpencodeWorkspace")();
+
+    assert.equal(
+      await rulesOperations.pathExists(
+        path.join(workspaceRoot, ".opencode", "rules", "ai-rules", "code.md")
+      ),
+      true
+    );
+    assert.ok(
+      state.warnings.some((message) => /add "instructions"/i.test(message)),
+      `expected a manual-instructions warning, got: ${state.warnings.join(" | ")}`
+    );
+    assert.equal(
+      await fs.readFile(path.join(workspaceRoot, "opencode.json"), "utf8"),
+      "{\n  instructions: [\n"
+    );
+  });
+});
+
 describe("WorkspaceRuleFileColorer", () => {
   test("provideFileDecoration returns active styling for a workspace .mdc rule", () => {
     state.workspaceFolderResolver = () => ({ name: "workspace" });
@@ -225,6 +316,38 @@ describe("WorkspaceRuleFileColorer", () => {
     colorer.refresh();
 
     assert.deepEqual(emitted, [[uri], undefined]);
+  });
+
+  test("provideFileDecoration styles opencode rule mirrors", () => {
+    state.workspaceFolderResolver = () => ({ name: "workspace" });
+    const colorer = new explorerDecorations.WorkspaceRuleFileColorer();
+    const active = colorer.provideFileDecoration(
+      Uri.file(path.join("/workspace", ".opencode", "rules", "ai-rules", "code.md"))
+    );
+    const disabled = colorer.provideFileDecoration(
+      Uri.file(path.join("/workspace", ".opencode", "rules", "ai-rules", "code.md.disabled"))
+    );
+
+    assert.equal(active.color.id, "aiRulebook.activeForeground");
+    assert.match(active.tooltip, /loaded by opencode/);
+    assert.equal(disabled.color.id, "aiRulebook.inactiveForeground");
+    assert.match(disabled.tooltip, /not loaded by opencode/);
+  });
+
+  test("provideFileDecoration leaves non-rule .md files outside opencode rules alone", () => {
+    state.workspaceFolderResolver = () => ({ name: "workspace" });
+    const colorer = new explorerDecorations.WorkspaceRuleFileColorer();
+
+    assert.equal(
+      colorer.provideFileDecoration(Uri.file(path.join("/workspace", "README.md"))),
+      undefined
+    );
+    assert.equal(
+      colorer.provideFileDecoration(
+        Uri.file(path.join("/workspace", ".cursor", "rules", "ai-rules", "README.md"))
+      ),
+      undefined
+    );
   });
 });
 
@@ -370,6 +493,52 @@ describe("bindRulesTreeView", () => {
       true
     );
     assert.equal(afterChangeCount, 1);
+  });
+
+  test("checkbox changes mirror the toggle to opencode when evidence exists", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(root) }];
+    await writeFile(path.join(root, "AGENTS.md"), "# rules\n");
+    const rulesDir = rulesOperations.workspaceRulesDir(root);
+    await writeFile(
+      path.join(rulesDir, ruleNode.ruleFile),
+      "---\ndescription: x\nalwaysApply: true\n---\n\nBody\n"
+    );
+    await rulesOperations.mirrorRuleToOpencode(root, ruleNode.ruleFile, true);
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
+    const context = { subscriptions: [] };
+    const mirror = path.join(root, ".opencode", "rules", "ai-rules", "code.md");
+
+    const view = sidebarTreeView.bindRulesTreeView(context, provider, async () => {});
+    await view.emitCheckboxState([[ruleNode, TreeItemCheckboxState.Unchecked]]);
+
+    assert.equal(await rulesOperations.isRuleEnabled(rulesDir, ruleNode.ruleFile), false);
+    assert.equal(await rulesOperations.pathExists(mirror), false);
+    assert.equal(
+      await rulesOperations.pathExists(`${mirror}.disabled`),
+      true
+    );
+  });
+
+  test("checkbox changes skip the opencode mirror when no evidence exists", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(root) }];
+    const rulesDir = rulesOperations.workspaceRulesDir(root);
+    await writeFile(path.join(rulesDir, ruleNode.ruleFile));
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
+    const context = { subscriptions: [] };
+
+    const view = sidebarTreeView.bindRulesTreeView(context, provider, async () => {});
+    await view.emitCheckboxState([[ruleNode, TreeItemCheckboxState.Unchecked]]);
+
+    assert.equal(
+      await rulesOperations.pathExists(
+        path.join(root, ".opencode", "rules", "ai-rules", "code.md.disabled")
+      ),
+      false
+    );
   });
 });
 
@@ -517,6 +686,32 @@ describe("extension activation", () => {
 
     await state.registeredCommands.get("aiRules.enableRuleWorkspace")();
     assert.equal(await rulesOperations.isRuleEnabled(rulesDir, SAMPLE_RULE), true);
+  });
+
+  test("bulk disable mirrors every rule off in the opencode folder", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    await writeFile(path.join(workspaceRoot, "AGENTS.md"), "# rules\n");
+    const rulesDir = rulesOperations.workspaceRulesDir(workspaceRoot);
+    await Promise.all(
+      RULE_FILES.map((ruleFile) => writeFile(path.join(rulesDir, ruleFile)))
+    );
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+
+    await state.registeredCommands.get("aiRules.disableCoreWorkspace")();
+
+    const dest = path.join(workspaceRoot, ".opencode", "rules", "ai-rules");
+    for (const ruleFile of RULE_FILES) {
+      const mirrorName = ruleFile.replace(".mdc", ".md");
+      assert.equal(await rulesOperations.pathExists(path.join(dest, mirrorName)), false);
+      assert.equal(
+        await rulesOperations.pathExists(path.join(dest, `${mirrorName}.disabled`)),
+        true
+      );
+    }
   });
 
   test("activate mirrors to Cline without creating Cursor rules on a non-Cursor host", async (t) => {

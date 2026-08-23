@@ -6,14 +6,22 @@ import test, { describe } from "node:test";
 
 import {
   ensureAiRulesIgnored,
+  ensureOpencodeInstructionsEntry,
   GENERATED_RULE_IGNORE_ENTRIES,
   installRulePack,
   isRuleEnabled,
+  mirrorRuleToOpencode,
+  OPENCODE_RULES_GLOB,
   pathExists,
   resetRulesDirToBundle,
+  resolveOpencodeConfigPath,
   setRuleEnabled,
+  stripCursorFrontmatter,
   syncBundledMdcsToClinerules,
+  syncBundledMdcsToOpencodeRules,
+  syncOpencodeMirrorFromWorkspace,
   workspaceRulesDir,
+  workspaceUsesOpencode,
 } from "../out/rulesOperations.js";
 
 const RULE_FILES = [
@@ -64,7 +72,7 @@ describe("path helpers", () => {
 });
 
 describe("ensureAiRulesIgnored", () => {
-  test("creates .gitignore with Cursor and Cline rule folders", async () => {
+  test("creates .gitignore with Cursor, Cline, and opencode rule folders", async () => {
     const root = await makeTempRoot("airules-ignore-new-");
     try {
       await ensureAiRulesIgnored(root);
@@ -94,7 +102,7 @@ describe("ensureAiRulesIgnored", () => {
 
   test("recognizes equivalent entries and remains idempotent", async () => {
     const root = await makeTempRoot("airules-ignore-idempotent-");
-    const initial = ".cursor/rules/ai-rules\n/.clinerules/ai-rules/\n";
+    const initial = `.cursor/rules/ai-rules\n/.clinerules/ai-rules/\n/.opencode/rules/ai-rules\n`;
     try {
       await writeFile(path.join(root, ".gitignore"), initial);
       await ensureAiRulesIgnored(root);
@@ -273,6 +281,357 @@ describe("syncBundledMdcsToClinerules", () => {
     } finally {
       await fs.rm(bundle, { recursive: true, force: true });
       await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("stripCursorFrontmatter", () => {
+  test("removes the frontmatter block and keeps the body", () => {
+    const body = "---\ndescription: Task scope\nalwaysApply: true\n---\n\n# Scope\n\n- Change only what the task requires.\n";
+    assert.equal(
+      stripCursorFrontmatter(body),
+      "\n# Scope\n\n- Change only what the task requires.\n"
+    );
+  });
+
+  test("normalizes CRLF line endings inside a stripped body", () => {
+    const body = "---\r\ndescription: x\r\n---\r\nBody\r\n";
+    assert.equal(stripCursorFrontmatter(body), "Body\n");
+  });
+
+  test("returns the body unchanged without frontmatter", () => {
+    assert.equal(stripCursorFrontmatter("# Scope\n"), "# Scope\n");
+  });
+
+  test("returns the body unchanged when the frontmatter block is unterminated", () => {
+    const body = "---\ndescription: x\n# Scope\n";
+    assert.equal(stripCursorFrontmatter(body), body);
+  });
+});
+
+describe("workspaceUsesOpencode", () => {
+  test("returns false when no opencode files exist", async () => {
+    const root = await makeTempRoot("airules-opencode-none-");
+    try {
+      assert.equal(await workspaceUsesOpencode(root), false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("recognizes AGENTS.md, opencode configs, and a .opencode folder", async () => {
+    const root = await makeTempRoot("airules-opencode-evidence-");
+    try {
+      await writeFile(path.join(root, "AGENTS.md"), "# rules\n");
+      assert.equal(await workspaceUsesOpencode(root), true);
+      await fs.rm(path.join(root, "AGENTS.md"));
+
+      await writeFile(path.join(root, "opencode.json"), "{}\n");
+      assert.equal(await workspaceUsesOpencode(root), true);
+      await fs.rm(path.join(root, "opencode.json"));
+
+      await writeFile(path.join(root, "opencode.jsonc"), "{}\n");
+      assert.equal(await workspaceUsesOpencode(root), true);
+      await fs.rm(path.join(root, "opencode.jsonc"));
+
+      await fs.mkdir(path.join(root, ".opencode"));
+      assert.equal(await workspaceUsesOpencode(root), true);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("resolveOpencodeConfigPath", () => {
+  test("falls back to .opencode/opencode.json when no config exists", async () => {
+    const root = await makeTempRoot("airules-opencode-resolve-");
+    try {
+      assert.equal(
+        await resolveOpencodeConfigPath(root),
+        path.join(root, ".opencode", "opencode.json")
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("prefers an existing root opencode.json", async () => {
+    const root = await makeTempRoot("airules-opencode-resolve-");
+    try {
+      await writeFile(path.join(root, "opencode.json"), "{}\n");
+      assert.equal(await resolveOpencodeConfigPath(root), path.join(root, "opencode.json"));
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("uses opencode.jsonc when opencode.json is absent", async () => {
+    const root = await makeTempRoot("airules-opencode-resolve-");
+    try {
+      await writeFile(path.join(root, "opencode.jsonc"), "{}\n");
+      assert.equal(await resolveOpencodeConfigPath(root), path.join(root, "opencode.jsonc"));
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("syncBundledMdcsToOpencodeRules", () => {
+  test("writes stripped topic rules as <topic>.md and ignores the folder", async () => {
+    const bundle = await makeTempRoot("airules-opencode-bundle-");
+    await writeFile(
+      path.join(bundle, SAMPLE_RULE),
+      "---\ndescription: x\nalwaysApply: true\n---\n\n# Code\n\n- Reuse code.\n"
+    );
+    const workspace = await makeTempRoot("airules-opencode-sync-");
+    try {
+      await syncBundledMdcsToOpencodeRules(workspace, bundle, [SAMPLE_RULE]);
+
+      const mirror = path.join(workspace, ".opencode", "rules", "ai-rules", "code.md");
+      assert.equal(
+        await fs.readFile(mirror, "utf8"),
+        "\n# Code\n\n- Reuse code.\n"
+      );
+      const gitignore = await fs.readFile(path.join(workspace, ".gitignore"), "utf8");
+      assert.equal(gitignore, `${GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`);
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses an unsafe rule path before touching disk", async () => {
+    const bundle = await makeTempRoot("airules-opencode-unsafe-");
+    const workspace = await makeTempRoot("airules-opencode-unsafe-ws-");
+    try {
+      await assert.rejects(
+        () => syncBundledMdcsToOpencodeRules(workspace, bundle, ["../escape.mdc"]),
+        /Refusing unsafe rule path|Bundled rule missing/
+      );
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("mirrors disabled Cursor rules as .md.disabled", async () => {
+    const bundle = await makeTempRoot("airules-opencode-state-bundle-");
+    await writeFile(
+      path.join(bundle, SAMPLE_RULE),
+      "---\ndescription: x\nalwaysApply: true\n---\n\n# Code\n\n- Reuse code.\n"
+    );
+    await writeFile(path.join(bundle, "scope.mdc"), "scope stub\n");
+    const workspace = await makeTempRoot("airules-opencode-state-ws-");
+    try {
+      const cursorDir = workspaceRulesDir(workspace);
+      await writeFile(path.join(cursorDir, `${SAMPLE_RULE}.disabled`), "off\n");
+      await writeFile(path.join(cursorDir, "scope.mdc"), "on\n");
+      await syncBundledMdcsToOpencodeRules(workspace, bundle, [SAMPLE_RULE, "scope.mdc"]);
+
+      const dest = path.join(workspace, ".opencode", "rules", "ai-rules");
+      assert.equal(await pathExists(path.join(dest, "code.md")), false);
+      assert.equal(
+        await fs.readFile(path.join(dest, "code.md.disabled"), "utf8"),
+        "\n# Code\n\n- Reuse code.\n"
+      );
+      assert.equal(await pathExists(path.join(dest, "scope.md")), true);
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("opencode mirror state", () => {
+  test("mirrorRuleToOpencode writes active and disabled mirrors from the Cursor file", async () => {
+    const workspace = await makeTempRoot("airules-mirror-");
+    try {
+      const cursorDir = workspaceRulesDir(workspace);
+      await writeFile(
+        path.join(cursorDir, SAMPLE_RULE),
+        "---\ndescription: x\nalwaysApply: true\n---\n\nBody\n"
+      );
+      const mirror = path.join(workspace, ".opencode", "rules", "ai-rules", "code.md");
+
+      await mirrorRuleToOpencode(workspace, SAMPLE_RULE, true);
+      assert.equal(await fs.readFile(mirror, "utf8"), "\nBody\n");
+      assert.equal(await pathExists(`${mirror}.disabled`), false);
+
+      await setRuleEnabled(workspaceRulesDir(workspace), SAMPLE_RULE, false);
+      await mirrorRuleToOpencode(workspace, SAMPLE_RULE, false);
+      assert.equal(await pathExists(mirror), false);
+      assert.equal(await fs.readFile(`${mirror}.disabled`, "utf8"), "\nBody\n");
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("mirrorRuleToOpencode leaves the mirror untouched when the Cursor source is missing", async () => {
+    const workspace = await makeTempRoot("airules-mirror-missing-");
+    try {
+      await mirrorRuleToOpencode(workspace, SAMPLE_RULE, true);
+      const mirror = path.join(workspace, ".opencode", "rules", "ai-rules", "code.md");
+      assert.equal(await pathExists(mirror), false);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("syncOpencodeMirrorFromWorkspace is a no-op without Cursor rules", async () => {
+    const workspace = await makeTempRoot("airules-mirror-nocursor-");
+    try {
+      await syncOpencodeMirrorFromWorkspace(workspace, [SAMPLE_RULE]);
+      assert.equal(
+        await pathExists(path.join(workspace, ".opencode", "rules", "ai-rules", "code.md")),
+        false
+      );
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("syncOpencodeMirrorFromWorkspace mirrors every rule state", async () => {
+    const workspace = await makeTempRoot("airules-mirror-bulk-");
+    try {
+      const cursorDir = workspaceRulesDir(workspace);
+      await writeFile(path.join(cursorDir, SAMPLE_RULE), "on\n");
+      await writeFile(path.join(cursorDir, "scope.mdc.disabled"), "off\n");
+      await syncOpencodeMirrorFromWorkspace(workspace, [SAMPLE_RULE, "scope.mdc"]);
+
+      const dest = path.join(workspace, ".opencode", "rules", "ai-rules");
+      assert.equal(await pathExists(path.join(dest, "code.md")), true);
+      assert.equal(await pathExists(path.join(dest, "scope.md")), false);
+      assert.equal(await pathExists(path.join(dest, "scope.md.disabled")), true);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ensureOpencodeInstructionsEntry", () => {
+  test("creates the default config with $schema and instructions", async () => {
+    const root = await makeTempRoot("airules-opencode-create-");
+    const configPath = path.join(root, ".opencode", "opencode.json");
+    try {
+      const result = await ensureOpencodeInstructionsEntry(configPath, OPENCODE_RULES_GLOB);
+      assert.equal(result, "created-config");
+      const parsed = JSON.parse(await fs.readFile(configPath, "utf8"));
+      assert.equal(parsed.$schema, "https://opencode.ai/config.json");
+      assert.deepEqual(parsed.instructions, [OPENCODE_RULES_GLOB]);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("adds a top-level instructions member to an existing config", async () => {
+    const root = await makeTempRoot("airules-opencode-add-key-");
+    const configPath = path.join(root, "opencode.json");
+    try {
+      await writeFile(configPath, '{\n  "model": "anthropic/claude-sonnet-4-6"\n}\n');
+      const result = await ensureOpencodeInstructionsEntry(configPath, OPENCODE_RULES_GLOB);
+      assert.equal(result, "updated-config");
+      const parsed = JSON.parse(await fs.readFile(configPath, "utf8"));
+      assert.equal(parsed.model, "anthropic/claude-sonnet-4-6");
+      assert.deepEqual(parsed.instructions, [OPENCODE_RULES_GLOB]);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("appends the glob to an existing instructions array", async () => {
+    const root = await makeTempRoot("airules-opencode-append-");
+    const configPath = path.join(root, "opencode.json");
+    try {
+      await writeFile(configPath, '{\n  "instructions": ["docs/guidelines.md"]\n}\n');
+      const result = await ensureOpencodeInstructionsEntry(configPath, OPENCODE_RULES_GLOB);
+      assert.equal(result, "updated-config");
+      const parsed = JSON.parse(await fs.readFile(configPath, "utf8"));
+      assert.deepEqual(parsed.instructions, ["docs/guidelines.md", OPENCODE_RULES_GLOB]);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("reports unchanged when the glob is already registered", async () => {
+    const root = await makeTempRoot("airules-opencode-unchanged-");
+    const configPath = path.join(root, "opencode.json");
+    const original = `{\n  "instructions": ["${OPENCODE_RULES_GLOB}"]\n}\n`;
+    try {
+      await writeFile(configPath, original);
+      const result = await ensureOpencodeInstructionsEntry(configPath, OPENCODE_RULES_GLOB);
+      assert.equal(result, "unchanged");
+      assert.equal(await fs.readFile(configPath, "utf8"), original);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("preserves comments and trailing commas in a JSONC config", async () => {
+    const root = await makeTempRoot("airules-opencode-jsonc-");
+    const configPath = path.join(root, "opencode.jsonc");
+    try {
+      await writeFile(
+        configPath,
+        "// opencode project config\n" +
+          '{\n  "$schema": "https://opencode.ai/config.json", // keep\n' +
+          '  "model": "anthropic/claude-sonnet-4-6",\n}\n'
+      );
+      const result = await ensureOpencodeInstructionsEntry(configPath, OPENCODE_RULES_GLOB);
+      assert.equal(result, "updated-config");
+      const updated = await fs.readFile(configPath, "utf8");
+      assert.ok(updated.includes("// opencode project config"));
+      assert.ok(updated.includes("// keep"));
+      const cleaned = updated
+        .replace(/^\s*\/\/[^\n]*\n/, "")
+        .replace(/,\s*\/\/[^\n]*/g, ",")
+        .replace(/,\s*([}\]])/g, "$1");
+      const parsed = JSON.parse(cleaned);
+      assert.equal(parsed.model, "anthropic/claude-sonnet-4-6");
+      assert.deepEqual(parsed.instructions, [OPENCODE_RULES_GLOB]);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("leaves an empty instructions array valid when inserting", async () => {
+    const root = await makeTempRoot("airules-opencode-empty-array-");
+    const configPath = path.join(root, "opencode.json");
+    try {
+      await writeFile(configPath, '{\n  "instructions": []\n}\n');
+      const result = await ensureOpencodeInstructionsEntry(configPath, OPENCODE_RULES_GLOB);
+      assert.equal(result, "updated-config");
+      const parsed = JSON.parse(await fs.readFile(configPath, "utf8"));
+      assert.deepEqual(parsed.instructions, [OPENCODE_RULES_GLOB]);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("returns skipped without touching a malformed config", async () => {
+    const root = await makeTempRoot("airules-opencode-bad-");
+    const configPath = path.join(root, "opencode.json");
+    const original = "{\n  instructions: [\n";
+    try {
+      await writeFile(configPath, original);
+      const result = await ensureOpencodeInstructionsEntry(configPath, OPENCODE_RULES_GLOB);
+      assert.equal(result, "skipped");
+      assert.equal(await fs.readFile(configPath, "utf8"), original);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("returns skipped when instructions exists but is not an array", async () => {
+    const root = await makeTempRoot("airules-opencode-nonarray-");
+    const configPath = path.join(root, "opencode.json");
+    const original = '{\n  "instructions": "AGENTS.md"\n}\n';
+    try {
+      await writeFile(configPath, original);
+      const result = await ensureOpencodeInstructionsEntry(configPath, OPENCODE_RULES_GLOB);
+      assert.equal(result, "skipped");
+      assert.equal(await fs.readFile(configPath, "utf8"), original);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
     }
   });
 });

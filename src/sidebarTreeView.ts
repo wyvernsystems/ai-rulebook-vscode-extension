@@ -1,5 +1,11 @@
 import * as vscode from "vscode";
-import { isRuleEnabled, setRuleEnabled, workspaceRulesDir } from "./rulesOperations";
+import { shouldAutoSyncOpencode } from "./opencode";
+import {
+  isRuleEnabled,
+  mirrorRuleToOpencode,
+  setRuleEnabled,
+  workspaceRulesDir,
+} from "./rulesOperations";
 import { UI_COLORS } from "./uiPresentation";
 
 /** ID must match the view contributed in package.json. */
@@ -29,7 +35,7 @@ function ruleStatusUri(ruleFile: string, enabled: boolean): vscode.Uri {
 /**
  * Colors rule labels in the sidebar tree:
  *   - active rules → AI Rulebook's theme-aware success color
- *   - disabled rules → AI Rulebook's theme-aware muted color
+ *   - disabled rules → AI Rulebook's theme-aware inactive color
  * Stateless: the URI path encodes the on/off state, so refreshing the tree
  * (which rebuilds resource URIs) updates colors without provider state.
  */
@@ -170,6 +176,17 @@ export function bindRulesTreeView(
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         vscode.window.showErrorMessage(`AI Rulebook: ${node.ruleFile} — ${msg}`);
+        continue;
+      }
+      if (await shouldAutoSyncOpencode(root)) {
+        try {
+          await mirrorRuleToOpencode(root, node.ruleFile, enable);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          vscode.window.showErrorMessage(
+            `AI Rulebook: opencode mirror for ${node.ruleFile} — ${msg}`
+          );
+        }
       }
     }
     await afterChange();

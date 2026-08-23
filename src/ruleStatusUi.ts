@@ -7,7 +7,7 @@ export function createAiRulesOutputChannel(): vscode.OutputChannel {
 
 /**
  * Writes rule-pack state (active vs off) as plain text into the
- * "AI Rulebook" Output channel. Visual highlighting (green for active, muted for
+ * "AI Rulebook" Output channel. Visual highlighting (green for active, red for
  * disabled) lives in the sidebar tree via the file decoration provider; the
  * Output channel is a plain-text log, so we deliberately avoid ANSI escapes
  * here—VS Code does not render them and they show up as `[32m...` literals.

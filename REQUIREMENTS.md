@@ -10,9 +10,10 @@ details belong in the code or in the rule files.
   `tests.mdc`, `docs.mdc`, `markdown.mdc`, and `git.mdc`) into
   `.cursor/rules/ai-rules/` of the open workspace. Each rule has
   `alwaysApply: true` and is installed enabled by default.
-- Before writing Cursor or Cline rules, the extension idempotently adds
-  `/.cursor/rules/ai-rules/` and `/.clinerules/ai-rules/` to the workspace
-  `.gitignore`, creating the file when absent.
+- Before writing Cursor, Cline, or opencode rules, the extension idempotently
+  adds `/.cursor/rules/ai-rules/`, `/.clinerules/ai-rules/`, and
+  `/.opencode/rules/ai-rules/` to the workspace `.gitignore`, creating the
+  file when absent.
 - On activation (and on `onDidChangeWorkspaceFolders`), if the workspace has
   no `.cursor/rules/ai-rules/` folder yet, the extension installs the bundled
   rule pack automatically. Existing rules folders are never overwritten by
@@ -35,11 +36,13 @@ details belong in the code or in the rule files.
   `aiRules.autoSyncClineWhenInstalled` is on, even if the `.cursor/` folder
   is skipped.
 - The sidebar tree view colors active rule labels green and disabled rule
-  labels muted gray (via a `FileDecorationProvider`) so on / off state is
-  visible without reading the description column.
-- The same color scheme is applied to rule files in VS Code's built-in
-  Explorer for any `<name>.mdc` / `<name>.mdc.disabled` under
-  `.cursor/rules/ai-rules/` in the open workspace. Gated by
+  labels red (via a `FileDecorationProvider`) so on / off state is visible
+  without reading the description column.
+- The same green / red scheme is applied to rule files in VS Code's built-in
+  Explorer: `<name>.mdc` / `<name>.mdc.disabled` under
+  `.cursor/rules/ai-rules/` and `<name>.md` / `<name>.md.disabled` under
+  `.opencode/rules/ai-rules/` in the open workspace. Files that merely end
+  in `.md` elsewhere are not tinted. Gated by
   `aiRules.colorRulesInExplorer` (default `true`).
 - A pair of commands toggles the Explorer tint at the User scope without
   touching the sidebar:
@@ -62,6 +65,26 @@ details belong in the code or in the rule files.
   `saoudrizwan.cline-nightly`) and `aiRules.autoSyncClineWhenInstalled` is
   on, the extension mirrors each topic rule into `.clinerules/ai-rules/` as
   `ai-rules-<topic>.md` after install, reset, manual sync, and first detection.
+- opencode mirroring (`.opencode/rules/ai-rules/`) is independent of the
+  Cursor install policy: when the workspace shows evidence of opencode usage
+  (an `AGENTS.md`, an `opencode.json` / `opencode.jsonc`, or a `.opencode/`
+  folder) and `aiRules.autoSyncOpencodeWhenInstalled` is on, the extension
+  mirrors each topic rule into `.opencode/rules/ai-rules/` as `<topic>.md`
+  with the Cursor frontmatter stripped, and registers
+  `.opencode/rules/ai-rules/*.md` in the `instructions` array of the
+  project's opencode config (root `opencode.json`, then `opencode.jsonc`,
+  then `.opencode/opencode.json`; the last is created when none exists).
+  The config edit preserves JSONC comments and trailing commas; a config
+  that cannot be parsed safely is left untouched and the user is warned.
+- The `AI Rulebook: Sync rule pack to opencode` command runs the opencode
+  mirror manually, regardless of the auto-sync gate.
+- The opencode mirror reflects the workspace's Cursor rule state: enabled
+  rules are written as `<topic>.md`, disabled rules as
+  `<topic>.md.disabled` (the `*.md` instructions glob skips them). Sidebar
+  checkbox toggles and the enable / disable-all commands update the mirror
+  immediately when opencode evidence exists and
+  `aiRules.autoSyncOpencodeWhenInstalled` is on. When the workspace has no
+  Cursor rules folder, every opencode rule defaults to enabled.
 
 ## Non-functional
 
@@ -75,8 +98,11 @@ details belong in the code or in the rule files.
 - **No secret material.** The extension must never read or write credentials,
   tokens, environment variables, or anything outside its allowed paths.
 - The extension only writes inside two well-known locations:
-  - the open workspace, under `.cursor/rules/ai-rules/` and (with Cline)
-    `.clinerules/ai-rules/`;
+  - the open workspace, under `.cursor/rules/ai-rules/`, (with Cline)
+    `.clinerules/ai-rules/`, and (with opencode) `.opencode/rules/ai-rules/`;
+  - the workspace's opencode config file (root `opencode.json` /
+    `opencode.jsonc` / `.opencode/opencode.json`), limited to adding the
+    generated `instructions` entry;
   - nowhere else.
 - **Manifest validation at activation.** Each entry must be a forward-slash
   relative path matching `^[A-Za-z0-9_./-]+$`, with no `..` segments, no

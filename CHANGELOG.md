@@ -6,6 +6,40 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **opencode support.** When the workspace shows evidence of opencode usage
+  (an `AGENTS.md`, an `opencode.json` / `opencode.jsonc`, or a `.opencode/`
+  folder) and `aiRules.autoSyncOpencodeWhenInstalled` is on, the extension
+  mirrors the rule pack into `.opencode/rules/ai-rules/` as plain `<topic>.md`
+  files (Cursor frontmatter stripped) and registers
+  `.opencode/rules/ai-rules/*.md` in the `instructions` array of the
+  project's opencode config, creating the config when absent. Config edits
+  preserve JSONC comments and trailing commas; unparseable configs are left
+  untouched with a clear warning.
+- **opencode on / off state.** The mirror reflects the workspace's Cursor
+  rule state: enabled rules live as `<topic>.md`, disabled rules as
+  `<topic>.md.disabled` (skipped by the `*.md` instructions glob). Sidebar
+  checkbox toggles and the enable / disable-all commands update the mirror
+  immediately when opencode evidence exists and the auto-sync setting is on.
+- **Red for disabled, everywhere.** The `aiRulebook.inactiveForeground`
+  theme token now defaults to red (`#F85149` dark / high contrast, `#CF222E`
+  light), so disabled rule labels appear red in both the AI Rulebook sidebar
+  and the Explorer file tree.
+- **Explorer colors for opencode rules.** `WorkspaceRuleFileColorer` now
+  tints `.opencode/rules/ai-rules/*.md` files green (active) and
+  `*.md.disabled` red, alongside the existing Cursor `.mdc` tinting. Tooltips
+  name the loading agent ("loaded by Cursor" / "loaded by opencode").
+- **`AI Rulebook: Sync rule pack to opencode`** command mirrors the pack to
+  opencode manually, independent of the auto-sync gate.
+- **New setting** `aiRules.autoSyncOpencodeWhenInstalled` (default `true`).
+- **Tests**: opencode mirroring, frontmatter stripping, config resolution,
+  JSONC-preserving `instructions` merging, the skip-on-invalid-config path,
+  state-aware mirroring, and Explorer / sidebar decoration behavior are
+  covered under `npm test`. The generated `.opencode/rules/ai-rules/`
+  folder is added to the workspace `.gitignore` alongside the Cursor and
+  Cline folders.
+
 ## [2.0.0] - 2026-08-22
 
 ### Added

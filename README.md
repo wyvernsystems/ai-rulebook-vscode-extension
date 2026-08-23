@@ -1,59 +1,105 @@
 # AI Rulebook
 
-AI Rulebook installs a focused set of always-on engineering rules for Cursor,
-with optional Cline support.
+AI Rulebook is a VS Code extension that installs a small set of always-on
+engineering rules for AI coding agents into your project. It supports Cursor,
+Cline, and opencode. The six topic rules cover scope, code reuse, testing,
+docs, Markdown, and Git. A sidebar lets you turn each rule on and off.
 
-The rules ask AI agents to:
+## The rules
 
-- keep changes within the requested scope;
-- reuse code, organize by feature, and handle inputs and errors safely;
-- add unit tests and report every failing or unrun check;
-- update project documentation only when its trigger applies;
-- use consistent Markdown and avoid unrequested Git mutations.
+- **`scope.mdc`** — change only what the task requires; match the conventions
+  of the file being edited.
+- **`code.mdc`** — reuse existing helpers, organize by feature, choose safe
+  dependencies, validate input, never log or commit secrets, wrap errors.
+- **`tests.mdc`** — write failing tests for the requirement first, then the
+  code; add or update unit tests for behavior changes; never weaken a test to
+  make it pass; report every failing or unrun check.
+- **`docs.mdc`** — update `README.md`, `REQUIREMENTS.md`, `DEPLOY.md`, and
+  `CHANGELOG.md` only when their trigger applies.
+- **`markdown.mdc`** — one H1, no skipped heading levels, `-` bullets,
+  language-tagged code fences, inline code for paths and commands, relative
+  links.
+- **`git.mdc`** — no commits, pushes, or branches unless asked.
 
-## Use
+## VS Code
 
-1. Install **AI Rulebook**.
-2. Open a project in Cursor.
-3. The extension installs six topic rules under `.cursor/rules/ai-rules/`.
-   Every rule is enabled and marked `alwaysApply: true` by default.
-4. Use the **AI Rulebook** sidebar checkboxes or commands to change their
-   enabled state.
+**Install**
 
-The generated Cursor and Cline rule folders are automatically added to the
-project's `.gitignore`, so using the extension remains optional for each
-developer.
+1. Build the extension: `npm install && npm test && npm run package`
+   → produces `ai-rulebook-<version>.vsix`.
+2. Extensions panel → `...` → **Install from VSIX...** (or
+   `code --install-extension ai-rulebook-<version>.vsix`).
 
-To disable automatic installation, set
-`aiRules.autoInstallOnOpenWorkspace` to `false`.
+**Use**
 
-## Commands
+1. Open a project folder.
+2. Plain VS Code does not auto-create `.cursor/rules/ai-rules/`. Run
+   **AI Rulebook: Install / update rule pack**, or set
+   `aiRules.installCursorRulesFolder` to `"always"`.
+3. If the project uses opencode (`AGENTS.md`, `opencode.json`, or a
+   `.opencode/` folder), the rules are mirrored to opencode automatically.
+4. Toggle rules with the **AI Rulebook** sidebar checkboxes or the
+   command-palette commands.
 
-Open the command palette and search for **AI Rulebook**. Rule-state commands
-include:
+## Cursor
 
-- **Enable one rule…** and **Disable one rule…** select an individual topic.
-- **Enable all rules (workspace)** and **Disable all rules (workspace)** change
-  the complete pack together.
+**Install**
 
-Additional commands install, update, or reset the pack; open rules or show pack
-status; sync to Cline; and show or hide rule colors.
+Install the same VSIX in Cursor — it is a VS Code-compatible host.
 
-## Rule files
+**Use**
 
-The editable source contains one file per topic:
+1. Open a project. Six rules auto-install into `.cursor/rules/ai-rules/`,
+   all enabled by default.
+2. Toggle individual rules or the whole pack from the **AI Rulebook**
+   sidebar.
+3. Rule files in the file tree are green when enabled, red when disabled.
 
-```text
-.cursor/rules/ai-rules/
-├── code.mdc
-├── docs.mdc
-├── git.mdc
-├── markdown.mdc
-├── scope.mdc
-└── tests.mdc
-```
+## opencode
 
-The extension packages synchronized copies under `bundled/ai-rules/`.
+**Set up the rules**
+
+1. Install the AI Rulebook extension in VS Code or Cursor:
+
+   ```bash
+   code --install-extension ai-rulebook-2.0.0.vsix
+   ```
+
+   or Extensions panel → `...` → **Install from VSIX...**.
+2. Open your project folder in that editor.
+3. Open the command palette and run
+   **AI Rulebook: Sync rule pack to opencode**. This writes the six rules to
+   `.opencode/rules/ai-rules/` and adds
+   `"instructions": [".opencode/rules/ai-rules/*.md"]` to your opencode
+   config (it creates `opencode.json` if you don't have one).
+4. Verify: `.opencode/rules/ai-rules/` now contains `code.md`, `docs.md`,
+   `git.md`, `markdown.md`, `scope.md`, and `tests.md`, and your opencode
+   config lists that folder in `instructions`.
+5. Restart opencode and open the project — the rules load alongside
+   `AGENTS.md`.
+
+If the project already has opencode files (`AGENTS.md`, `opencode.json`, or a
+`.opencode/` folder), step 3 happens automatically when you open the folder —
+no manual sync needed.
+
+After setup, toggling rules in the **AI Rulebook** sidebar keeps the mirror in
+sync: enabled rules stay as `<topic>.md`, disabled rules become
+`<topic>.md.disabled` and are skipped.
+
+**Without the extension**: copy the rule files into
+`.opencode/rules/ai-rules/` yourself and add
+`"instructions": [".opencode/rules/ai-rules/*.md"]` to your `opencode.json`.
+
+## Notes
+
+- Generated rule folders (`.cursor/rules/ai-rules/`,
+  `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`) are added to
+  `.gitignore` automatically, so each developer opts in.
+- With Cline installed, the rules are mirrored to `.clinerules/ai-rules/`
+  automatically.
+- Disable automatic installation with
+  `aiRules.autoInstallOnOpenWorkspace: false`.
+- Rule source files live under `.cursor/rules/ai-rules/` and are editable.
 
 ## Development
 

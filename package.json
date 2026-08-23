@@ -1,7 +1,7 @@
 {
   "name": "ai-rulebook",
   "displayName": "AI Rulebook",
-  "description": "AI Rulebook — install and manage focused, always-on engineering rules for Cursor, with optional Cline sync.",
+  "description": "AI Rulebook — install and manage focused, always-on engineering rules for Cursor, with optional Cline and opencode sync.",
   "version": "2.0.0",
   "publisher": "WyvernSystemsLLC",
   "license": "MIT",
@@ -23,6 +23,7 @@
     "rules",
     "rulebook",
     "cline",
+    "opencode",
     "prompt-engineering",
     "code-assistant"
   ],
@@ -68,6 +69,11 @@
       {
         "command": "aiRules.syncClineWorkspace",
         "title": "AI Rulebook: Sync rule pack to Cline",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.syncOpencodeWorkspace",
+        "title": "AI Rulebook: Sync rule pack to opencode",
         "category": "AI Rulebook"
       },
       {
@@ -176,9 +182,9 @@
         "id": "aiRulebook.inactiveForeground",
         "description": "Foreground color for disabled rules.",
         "defaults": {
-          "dark": "#8B949E",
-          "light": "#656D76",
-          "highContrast": "#A5A5A5"
+          "dark": "#F85149",
+          "light": "#CF222E",
+          "highContrast": "#F85149"
         }
       }
     ],
@@ -219,6 +225,11 @@
           "type": "boolean",
           "default": true,
           "description": "When Cline is installed, automatically mirror the rule pack into .clinerules/ai-rules/ after install or reset and when Cline is first detected."
+        },
+        "aiRules.autoSyncOpencodeWhenInstalled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When the workspace shows evidence of opencode usage (an AGENTS.md, an opencode.json/opencode.jsonc, or a .opencode/ folder), automatically mirror the rule pack into .opencode/rules/ai-rules/ and register it in the opencode config's instructions array after install or reset."
         }
       }
     }
