@@ -50,10 +50,16 @@ npm install
 npm test
 ```
 
-`npm test` compiles, runs `verify:bundled`, and runs the suite. It fails if
-`bundled/ai-rules/` has drifted from `.cursor/rules/ai-rules/`, which is the
-most common reason a release build breaks. If you edited rule text, run
-`npm run sync-bundled` and re-run `npm test`.
+`npm test` compiles, runs `verify:bundled`, and runs the suite.
+`verify:bundled` fails if `bundled/manifest.json` no longer lists exactly the
+rules in `bundled/ai-rules/`, if a rule is missing a `description`, or if a
+rule carries a placeholder the extension cannot render. If you added or
+removed a rule file, run `npm run sync-bundled` to regenerate the manifest
+and re-run `npm test`.
+
+Rule text is edited in `bundled/ai-rules/`. The `.cursor/rules/ai-rules/`
+folder is a generated install, gitignored and absent on a fresh clone, so
+nothing in the release path reads from it.
 
 ### 2. Bump the version
 

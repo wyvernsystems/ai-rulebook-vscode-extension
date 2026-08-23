@@ -17,6 +17,9 @@ tsconfig.json
 package-lock.json
 *.vsix
 icon-source.png
+REQUIREMENTS.md
+DEPLOY.md
+.github-release-notes-*.md
 !bundled/**
 !out/**
 !icon.png

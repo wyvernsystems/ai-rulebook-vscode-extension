@@ -32,6 +32,19 @@ describe("readBundleManifest (shipped pack)", () => {
     assert.deepEqual(manifest.files, RULE_FILES);
   });
 
+  test("manifest lists exactly the rule files present in the bundle", async () => {
+    // bundled/ai-rules is the tracked source of truth, so a rule added or
+    // removed without regenerating the manifest must fail the suite, not just
+    // `npm run verify:bundled`.
+    const bundleDir = path.join(repoRoot, "bundled", "ai-rules");
+    const onDisk = (await fs.readdir(bundleDir))
+      .filter((name) => name.endsWith(".mdc") || name.endsWith(".mdc.disabled"))
+      .map((name) => (name.endsWith(".disabled") ? name.slice(0, -".disabled".length) : name))
+      .sort((a, b) => a.localeCompare(b));
+
+    assert.deepEqual(readBundleManifest(repoRoot).files, onDisk);
+  });
+
   test("ships behavior rules as always-on and formatting rules as glob-scoped", async () => {
     // markdown.mdc only applies while editing Markdown, so it costs nothing on
     // other turns. Every other rule must be live while code is being written.

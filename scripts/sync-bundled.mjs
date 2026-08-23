@@ -1,8 +1,15 @@
 #!/usr/bin/env node
 /**
- * Copies `.cursor/rules/ai-rules/` → `bundled/ai-rules/` (recursive)
- * and writes `bundled/manifest.json`. Each rule appears **once** as a logical
- * `*.mdc` path (whether the file on disk is `*.mdc` or `*.mdc.disabled`).
+ * Regenerates `bundled/manifest.json` from the rule files in
+ * `bundled/ai-rules/`.
+ *
+ * `bundled/ai-rules/` is the tracked source of truth for the rule pack. The
+ * workspace copy at `.cursor/rules/ai-rules/` is a generated install that the
+ * extension renders (`{{TEST_COMMAND}}` is substituted per project), so it is
+ * gitignored and is never copied back here.
+ *
+ * Each rule appears once as a logical `*.mdc` path whether the file on disk is
+ * `*.mdc` or `*.mdc.disabled`, so a rule can ship switched off.
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -10,18 +17,13 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-const sourceDir = path.join(repoRoot, ".cursor", "rules", "ai-rules");
-const destDir = path.join(repoRoot, "bundled", "ai-rules");
+const bundleDir = path.join(repoRoot, "bundled", "ai-rules");
 const manifestPath = path.join(repoRoot, "bundled", "manifest.json");
 
-if (!fs.existsSync(sourceDir)) {
-  console.error("Missing source rules folder:", sourceDir);
+if (!fs.existsSync(bundleDir)) {
+  console.error("Missing rule pack source:", bundleDir);
   process.exit(1);
 }
-
-fs.mkdirSync(path.dirname(destDir), { recursive: true });
-fs.rmSync(destDir, { recursive: true, force: true });
-fs.cpSync(sourceDir, destDir, { recursive: true });
 
 function listShippedFiles(rootDir) {
   const out = [];
@@ -43,7 +45,7 @@ function listShippedFiles(rootDir) {
   return out.sort();
 }
 
-const rawFiles = listShippedFiles(destDir);
+const rawFiles = listShippedFiles(bundleDir);
 
 const nonMdc = [];
 const activeLogical = new Set();
@@ -70,6 +72,11 @@ for (const rel of rawFiles) {
   }
 }
 
+if (activeLogical.size + disabledLogical.size === 0) {
+  console.error("No .mdc rules found in", bundleDir);
+  process.exit(1);
+}
+
 const logicalMdcs = [...new Set([...activeLogical, ...disabledLogical])].sort((a, b) =>
   a.localeCompare(b)
 );
@@ -77,10 +84,4 @@ const logicalMdcs = [...new Set([...activeLogical, ...disabledLogical])].sort((a
 const manifestFiles = [...nonMdc.sort((a, b) => a.localeCompare(b)), ...logicalMdcs];
 
 fs.writeFileSync(manifestPath, JSON.stringify({ version: 1, files: manifestFiles }, null, 2) + "\n", "utf8");
-console.log(
-  "Synced",
-  rawFiles.length,
-  "files to bundled/ai-rules/; manifest",
-  manifestFiles.length,
-  "entries."
-);
+console.log("Wrote bundled/manifest.json with", manifestFiles.length, "entries.");

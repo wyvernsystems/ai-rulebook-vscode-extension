@@ -69,7 +69,7 @@ Install the same VSIX in Cursor — it is a VS Code-compatible host.
 1. Install the AI Rulebook extension in VS Code or Cursor:
 
    ```bash
-   code --install-extension ai-rulebook-2.5.0.vsix
+   code --install-extension ai-rulebook-2.5.1.vsix
    ```
 
    or Extensions panel → `...` → **Install from VSIX...**.
@@ -106,7 +106,8 @@ sync: enabled rules stay as `<topic>.md`, disabled rules become
   automatically.
 - Disable automatic installation with
   `aiRules.autoInstallOnOpenWorkspace: false`.
-- Rule source files live under `.cursor/rules/ai-rules/` and are editable.
+- Rule files installed under `.cursor/rules/ai-rules/` are editable; the
+  extension only overwrites them on install, update, or reset.
 
 ## Development
 
@@ -116,11 +117,15 @@ npm test
 npm run package
 ```
 
-Run `npm run sync-bundled` after editing the source rule files.
+Rule text is edited in `bundled/ai-rules/`, the tracked source of truth that
+ships in the VSIX. Run `npm run sync-bundled` after adding or removing a rule
+file to regenerate `bundled/manifest.json`.
 
-Source rules under `.cursor/rules/ai-rules/` hold the `{{TEST_COMMAND}}`
-token verbatim — they are the template the extension renders from, so this
-repo's own working copy shows the token rather than a command.
+Source rules hold the `{{TEST_COMMAND}}` token verbatim; the extension
+substitutes the project's real command on the way into a workspace. The
+`.cursor/rules/ai-rules/` folder in this repo is that rendered install — it is
+gitignored, absent on a fresh clone, and must not be edited as if it were the
+source.
 
 Cutting a release is documented in [DEPLOY.md](./DEPLOY.md).
 

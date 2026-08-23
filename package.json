@@ -2,7 +2,7 @@
   "name": "ai-rulebook",
   "displayName": "AI Rulebook",
   "description": "AI Rulebook — install and manage focused, always-on engineering rules for Cursor, with optional Cline and opencode sync.",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "publisher": "WyvernSystemsLLC",
   "license": "MIT",
   "icon": "icon.png",

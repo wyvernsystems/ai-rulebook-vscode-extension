@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-08-23
+
+### Fixed
+
+- **A fresh clone can build again.** `bundled/ai-rules/` is now the tracked
+  source of truth for rule text. `.cursor/rules/ai-rules/` is no longer
+  tracked, so `verify:bundled` and `sync-bundled` no longer require it —
+  both previously exited 1 when it was absent, which broke `npm test` and
+  `npm run package` on any fresh clone. The byte-identity check between the
+  two folders was also unsatisfiable once rules began rendering
+  `{{TEST_COMMAND}}` per project.
+- **`verify:bundled` checks what has to hold.** It now confirms
+  `bundled/manifest.json` lists exactly the rules in `bundled/ai-rules/`,
+  that every rule has a `description` in its frontmatter, and that no rule
+  ships an unknown `{{...}}` placeholder. `sync-bundled` regenerates the
+  manifest from the bundle instead of copying a folder into it. A unit test
+  covers manifest-to-directory agreement so the suite catches drift on its
+  own.
+- **Maintainer docs no longer ship in the VSIX.** `.vscodeignore` now excludes
+  `REQUIREMENTS.md`, `DEPLOY.md`, and release-note scratch files, restoring
+  the documented package contents: `out/**`, `bundled/**`, `icon.png`,
+  `LICENSE`, `README.md`, `CHANGELOG.md`, and `package.json`. `REQUIREMENTS.md`
+  had been included since before 2.0.0.
+
 ## [2.5.0] - 2026-08-23
 
 ### Added

@@ -51,9 +51,14 @@ details belong in the code or in the rule files.
   - `AI Rulebook: Show rule pack status` sets it back to `true`
     (idempotent), focuses the sidebar, and writes a plain-text snapshot to
     the Output channel.
-- Source of truth for rule text is `.cursor/rules/ai-rules/`. The VSIX ships
-  a byte-identical copy under `bundled/ai-rules/`. `npm run verify:bundled`
-  must pass before packaging.
+- Source of truth for rule text is `bundled/ai-rules/`, the copy shipped in
+  the VSIX. The workspace copy at `.cursor/rules/ai-rules/` is a generated,
+  gitignored install that the extension renders per project, so it is not
+  byte-identical to the source and is absent on a fresh clone.
+- `npm run verify:bundled` must pass before packaging. It checks that
+  `bundled/manifest.json` lists exactly the rules in `bundled/ai-rules/`, that
+  every rule has a `description` in its frontmatter, and that no rule carries
+  a placeholder the extension cannot render.
 - The bundled rules constrain task scope, code reuse and organization,
   dependency choices, input and error safety, testing integrity, triggered
   documentation updates, Markdown formatting, and unrequested Git mutations.
