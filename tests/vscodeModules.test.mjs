@@ -175,10 +175,7 @@ describe("opencode detection and sync", () => {
       await fs.readFile(path.join(root, ".opencode", "opencode.json"), "utf8")
     );
     assert.deepEqual(config.instructions, [".opencode/rules/ai-rules/*.md"]);
-    assert.equal(
-      await fs.readFile(path.join(root, ".gitignore"), "utf8"),
-      `${rulesOperations.GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`
-    );
+    assert.equal(await rulesOperations.pathExists(path.join(root, ".gitignore")), false);
   });
 
   test("activate mirrors to opencode on a non-Cursor host with workspace evidence", async (t) => {
@@ -614,15 +611,12 @@ describe("extension activation", () => {
     for (const ruleFile of RULE_FILES) {
       assert.equal(await rulesOperations.pathExists(path.join(rulesDir, ruleFile)), true);
     }
-    assert.equal(
-      await fs.readFile(path.join(workspaceRoot, ".gitignore"), "utf8"),
-      `${rulesOperations.GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`
-    );
+    assert.equal(await rulesOperations.pathExists(path.join(workspaceRoot, ".gitignore")), false);
     assert.ok(state.informationMessages.some((message) => /installed the rule pack/.test(message)));
     assert.ok(state.outputChannels[0].lines.some((line) => line === `active\t${SAMPLE_RULE}`));
   });
 
-  test("activate adds ignore entries when the rules folder already exists", async (t) => {
+  test("activate leaves an existing rules folder alone and does not write .gitignore", async (t) => {
     const workspaceRoot = await makeTempWorkspace();
     t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
     workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
@@ -637,9 +631,13 @@ describe("extension activation", () => {
     await extension.activate(context);
 
     assert.equal(
-      await fs.readFile(path.join(workspaceRoot, ".gitignore"), "utf8"),
-      `${rulesOperations.GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`
+      await fs.readFile(
+        path.join(rulesOperations.workspaceRulesDir(workspaceRoot), SAMPLE_RULE),
+        "utf8"
+      ),
+      "existing\n"
     );
+    assert.equal(await rulesOperations.pathExists(path.join(workspaceRoot, ".gitignore")), false);
   });
 
   test("workspace pack commands disable and enable every topic rule", async (t) => {
@@ -733,10 +731,7 @@ describe("extension activation", () => {
       ),
       true
     );
-    assert.equal(
-      await fs.readFile(path.join(workspaceRoot, ".gitignore"), "utf8"),
-      `${rulesOperations.GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`
-    );
+    assert.equal(await rulesOperations.pathExists(path.join(workspaceRoot, ".gitignore")), false);
     assert.equal(values.get("aiRules.nonCursorHostNoticeShown"), true);
   });
 

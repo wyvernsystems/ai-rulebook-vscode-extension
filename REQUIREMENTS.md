@@ -10,10 +10,8 @@ details belong in the code or in the rule files.
   `tests.mdc`, `docs.mdc`, `markdown.mdc`, and `git.mdc`) into
   `.cursor/rules/ai-rules/` of the open workspace. Each rule has
   `alwaysApply: true` and is installed enabled by default.
-- Before writing Cursor, Cline, or opencode rules, the extension idempotently
-  adds `/.cursor/rules/ai-rules/`, `/.clinerules/ai-rules/`, and
-  `/.opencode/rules/ai-rules/` to the workspace `.gitignore`, creating the
-  file when absent.
+- The extension does **not** modify the workspace `.gitignore`. Installed
+  rule folders are left unignored so they can be committed and shared.
 - On activation (and on `onDidChangeWorkspaceFolders`), if the workspace has
   no `.cursor/rules/ai-rules/` folder yet, the extension installs the bundled
   rule pack automatically. Existing rules folders are never overwritten by

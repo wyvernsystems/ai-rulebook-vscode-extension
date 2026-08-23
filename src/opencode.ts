@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import {
-  ensureAiRulesIgnored,
   ensureOpencodeInstructionsEntry,
   OPENCODE_RULES_GLOB,
   resolveOpencodeConfigPath,
@@ -33,8 +32,8 @@ export async function shouldAutoSyncOpencode(workspaceRoot: string): Promise<boo
 
 /**
  * Mirrors the bundled rule pack for opencode: writes stripped `.md` copies
- * into `.opencode/rules/ai-rules/`, keeps the generated folder out of source
- * control, and registers the folder via the `instructions` array of the
+ * into `.opencode/rules/ai-rules/`, and registers the folder via the
+ * `instructions` array of the
  * project's opencode config (creating the config when absent).
  */
 export async function syncRulePackToOpencode(
@@ -43,7 +42,6 @@ export async function syncRulePackToOpencode(
   ruleFiles: readonly string[],
   testCommand: TestCommand
 ): Promise<OpencodeConfigMergeResult> {
-  await ensureAiRulesIgnored(workspaceRoot);
   await syncBundledMdcsToOpencodeRules(workspaceRoot, bundleDir, ruleFiles, testCommand);
   const configPath = await resolveOpencodeConfigPath(workspaceRoot);
   return ensureOpencodeInstructionsEntry(configPath, OPENCODE_RULES_GLOB);

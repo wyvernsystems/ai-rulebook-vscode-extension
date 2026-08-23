@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.5.2] - 2026-08-23
+
+### Changed
+
+- **Installed rule folders are no longer added to `.gitignore`.** The
+  extension used to write `/.cursor/rules/ai-rules/`,
+  `/.clinerules/ai-rules/`, and `/.opencode/rules/ai-rules/` into the
+  workspace ignore file on every install and sync. That made the rules
+  invisible to git, so teammates never saw them. Those entries are no longer
+  written; rule folders can be committed and shared like any other project
+  file. Existing entries already present in a workspace `.gitignore` are
+  left alone.
+
 ## [2.5.1] - 2026-08-23
 
 ### Fixed

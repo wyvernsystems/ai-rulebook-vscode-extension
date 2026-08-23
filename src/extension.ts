@@ -13,7 +13,6 @@ import {
   showRulePackStatusInOutput,
 } from "./ruleStatusUi";
 import {
-  ensureAiRulesIgnored,
   installRulePack,
   OPENCODE_RULES_GLOB,
   pathExists,
@@ -209,7 +208,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     const rulesDir = workspaceRulesDir(root);
     if (await pathExists(rulesDir)) {
-      await ensureAiRulesIgnored(root);
       return;
     }
     if (!(await pathExists(bundleDir))) {
@@ -246,7 +244,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       return;
     }
 
-    await ensureAiRulesIgnored(root);
     await installRulePack(bundleDir, rulesDir, mdcs, testCommand);
     const parts = [
       "AI Rulebook: installed the rule pack into `.cursor/rules/ai-rules/`.",
@@ -289,7 +286,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!(await pathExists(bundleDir))) {
       throw new Error(`Missing bundle at ${bundleDir}`);
     }
-    await ensureAiRulesIgnored(root);
     const testCommand = await detectTestCommand(root);
     await installRulePack(bundleDir, rulesDir, mdcs, testCommand);
     const parts = ["AI Rulebook: installed the rule pack into `.cursor/rules/ai-rules/`."];
@@ -494,7 +490,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (choice !== "Reset to defaults") {
       return;
     }
-    await ensureAiRulesIgnored(root);
     await resetRulesDirToBundle(bundleDir, workspaceRulesDir(root), await detectTestCommand(root));
     const clineSynced = await maybeAutoSyncCline(root);
     const opencodeSynced = await maybeAutoSyncOpencode(root);

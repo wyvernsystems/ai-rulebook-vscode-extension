@@ -5,9 +5,7 @@ import * as path from "node:path";
 import test, { describe } from "node:test";
 
 import {
-  ensureAiRulesIgnored,
   ensureOpencodeInstructionsEntry,
-  GENERATED_RULE_IGNORE_ENTRIES,
   installRulePack,
   isRuleEnabled,
   mirrorRuleToOpencode,
@@ -75,47 +73,46 @@ describe("path helpers", () => {
   });
 });
 
-describe("ensureAiRulesIgnored", () => {
-  test("creates .gitignore with Cursor, Cline, and opencode rule folders", async () => {
-    const root = await makeTempRoot("airules-ignore-new-");
+describe("the workspace .gitignore is never touched", () => {
+  // Rule folders are meant to be committable, so a team shares one pack.
+  // Ignoring them was self-defeating: the rules the extension installs would
+  // never reach anyone else's checkout.
+  test("installing does not create a .gitignore", async () => {
+    const bundle = await makeMiniBundle();
+    const root = await makeTempRoot("airules-nogitignore-install-");
     try {
-      await ensureAiRulesIgnored(root);
-
-      const gitignore = await fs.readFile(path.join(root, ".gitignore"), "utf8");
-      assert.equal(gitignore, `${GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`);
+      await installRulePack(bundle, workspaceRulesDir(root), RULE_FILES, null);
+      assert.equal(await pathExists(path.join(root, ".gitignore")), false);
     } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
       await fs.rm(root, { recursive: true, force: true });
     }
   });
 
-  test("appends missing entries without changing existing content", async () => {
-    const root = await makeTempRoot("airules-ignore-existing-");
+  test("the Cline and opencode mirrors leave an existing .gitignore byte-identical", async () => {
+    const bundle = await makeMiniBundle();
+    const workspace = await makeTempRoot("airules-nogitignore-mirrors-");
+    const original = "node_modules/\ndist/\n";
     try {
-      await writeFile(path.join(root, ".gitignore"), "node_modules/");
-      await ensureAiRulesIgnored(root);
+      await writeFile(path.join(workspace, ".gitignore"), original);
 
-      const gitignore = await fs.readFile(path.join(root, ".gitignore"), "utf8");
+      await syncBundledMdcsToClinerules(workspace, bundle, RULE_FILES, null);
+      await syncBundledMdcsToOpencodeRules(workspace, bundle, RULE_FILES, null);
+
       assert.equal(
-        gitignore,
-        `node_modules/\n${GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`
+        await fs.readFile(path.join(workspace, ".gitignore"), "utf8"),
+        original
       );
     } finally {
-      await fs.rm(root, { recursive: true, force: true });
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(workspace, { recursive: true, force: true });
     }
   });
 
-  test("recognizes equivalent entries and remains idempotent", async () => {
-    const root = await makeTempRoot("airules-ignore-idempotent-");
-    const initial = `.cursor/rules/ai-rules\n/.clinerules/ai-rules/\n/.opencode/rules/ai-rules\n`;
-    try {
-      await writeFile(path.join(root, ".gitignore"), initial);
-      await ensureAiRulesIgnored(root);
-      await ensureAiRulesIgnored(root);
-
-      assert.equal(await fs.readFile(path.join(root, ".gitignore"), "utf8"), initial);
-    } finally {
-      await fs.rm(root, { recursive: true, force: true });
-    }
+  test("the module no longer exports gitignore helpers", async () => {
+    const mod = await import("../out/rulesOperations.js");
+    assert.equal(mod.ensureAiRulesIgnored, undefined);
+    assert.equal(mod.GENERATED_RULE_IGNORE_ENTRIES, undefined);
   });
 });
 
@@ -358,8 +355,7 @@ describe("syncBundledMdcsToClinerules", () => {
         assert.equal(await fs.readFile(mirror, "utf8"), `${ruleFile}\n`);
       }
       assert.equal(await pathExists(path.join(dest, "ai-rules-core.md")), false);
-      const gitignore = await fs.readFile(path.join(workspace, ".gitignore"), "utf8");
-      assert.equal(gitignore, `${GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`);
+      assert.equal(await pathExists(path.join(workspace, ".gitignore")), false);
     } finally {
       await fs.rm(bundle, { recursive: true, force: true });
       await fs.rm(workspace, { recursive: true, force: true });
@@ -459,7 +455,7 @@ describe("resolveOpencodeConfigPath", () => {
 });
 
 describe("syncBundledMdcsToOpencodeRules", () => {
-  test("writes stripped topic rules as <topic>.md and ignores the folder", async () => {
+  test("writes stripped topic rules as <topic>.md without touching .gitignore", async () => {
     const bundle = await makeTempRoot("airules-opencode-bundle-");
     await writeFile(
       path.join(bundle, SAMPLE_RULE),
@@ -474,8 +470,7 @@ describe("syncBundledMdcsToOpencodeRules", () => {
         await fs.readFile(mirror, "utf8"),
         "\n# Code\n\n- Reuse code.\n"
       );
-      const gitignore = await fs.readFile(path.join(workspace, ".gitignore"), "utf8");
-      assert.equal(gitignore, `${GENERATED_RULE_IGNORE_ENTRIES.join("\n")}\n`);
+      assert.equal(await pathExists(path.join(workspace, ".gitignore")), false);
     } finally {
       await fs.rm(bundle, { recursive: true, force: true });
       await fs.rm(workspace, { recursive: true, force: true });

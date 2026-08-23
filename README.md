@@ -69,7 +69,7 @@ Install the same VSIX in Cursor — it is a VS Code-compatible host.
 1. Install the AI Rulebook extension in VS Code or Cursor:
 
    ```bash
-   code --install-extension ai-rulebook-2.5.1.vsix
+   code --install-extension ai-rulebook-2.5.2.vsix
    ```
 
    or Extensions panel → `...` → **Install from VSIX...**.
@@ -100,8 +100,8 @@ sync: enabled rules stay as `<topic>.md`, disabled rules become
 ## Notes
 
 - Generated rule folders (`.cursor/rules/ai-rules/`,
-  `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`) are added to
-  `.gitignore` automatically, so each developer opts in.
+  `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`) are left unignored so
+  they can be committed and shared with the team.
 - With Cline installed, the rules are mirrored to `.clinerules/ai-rules/`
   automatically.
 - Disable automatic installation with
