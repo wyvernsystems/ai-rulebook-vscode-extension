@@ -39,6 +39,33 @@ All notable changes to this project are documented here. The format follows
   covered under `npm test`. The generated `.opencode/rules/ai-rules/`
   folder is added to the workspace `.gitignore` alongside the Cursor and
   Cline folders.
+- **Test-command detection.** Rule text is rendered on the way into a
+  workspace: the `{{TEST_COMMAND}}` token in `tests.mdc` is replaced with the
+  project's actual command. Detection reads a real `package.json` `test`
+  script (choosing `npm` / `pnpm` / `yarn` / `bun` from the lockfile), then
+  `Cargo.toml`, `go.mod`, explicit pytest configuration, and a `test` target
+  in a `Makefile`. Ambiguous projects fall back to the prose "the project's
+  test command" rather than naming a command that does not exist. Rendering
+  applies to the Cursor install, the reset-to-defaults path, and both the
+  Cline and opencode mirrors.
+
+### Changed
+
+- **`markdown.mdc` is glob-scoped** to `**/*.{md,mdx}` instead of always-on.
+  Its guidance only applies while editing Markdown, so it no longer consumes
+  context on every other turn. The rule body keeps its "When editing `.md`
+  files" preamble, which is what scopes it in the Cline and opencode mirrors
+  where frontmatter is stripped.
+- **`scope.mdc` resolves its own precedence.** A new bullet states that tests
+  and documentation for the change itself are part of the task, so "change
+  only what the task requires" can no longer be read as permission to skip
+  the rules in `tests.mdc` and `docs.mdc`.
+
+### Fixed
+
+- **`tests.mdc` no longer ships an unfilled placeholder.** Every installed
+  copy previously told the agent to run the literal text
+  `<your test command>`, which nothing substituted.
 
 ## [2.0.0] - 2026-08-22
 

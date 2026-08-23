@@ -23,6 +23,10 @@ import {
   workspaceRulesDir,
   workspaceUsesOpencode,
 } from "../out/rulesOperations.js";
+import {
+  TEST_COMMAND_PLACEHOLDER,
+  UNKNOWN_TEST_COMMAND_TEXT,
+} from "../out/testCommand.js";
 
 const RULE_FILES = [
   "code.mdc",
@@ -168,7 +172,7 @@ describe("installRulePack", () => {
     const rules = await makeTempRoot("airules-install-");
     try {
       await writeFile(path.join(rules, "user-extra.mdc"), "keep me\n");
-      await installRulePack(bundle, rules, RULE_FILES);
+      await installRulePack(bundle, rules, RULE_FILES, null);
       for (const ruleFile of RULE_FILES) {
         assert.equal(await isRuleEnabled(rules, ruleFile), true);
       }
@@ -186,7 +190,7 @@ describe("installRulePack", () => {
       await writeFile(path.join(rules, `${SAMPLE_RULE}.disabled`), "stale disabled\n");
       await writeFile(path.join(rules, "core.mdc"), "legacy\n");
 
-      await installRulePack(bundle, rules, RULE_FILES);
+      await installRulePack(bundle, rules, RULE_FILES, null);
 
       assert.equal(await isRuleEnabled(rules, SAMPLE_RULE), true);
       assert.equal(await pathExists(path.join(rules, `${SAMPLE_RULE}.disabled`)), false);
@@ -206,12 +210,90 @@ describe("installRulePack", () => {
     const rules = await makeTempRoot("airules-missing-dest-");
     try {
       await assert.rejects(
-        () => installRulePack(bundle, rules, RULE_FILES),
+        () => installRulePack(bundle, rules, RULE_FILES, null),
         /Bundled rule missing: .*\.mdc/
       );
     } finally {
       await fs.rm(bundle, { recursive: true, force: true });
       await fs.rm(rules, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("install-time test command rendering", () => {
+  const RULE_WITH_PLACEHOLDER =
+    `---\ndescription: x\nalwaysApply: true\n---\n\n# Tests\n\n- Then run ${TEST_COMMAND_PLACEHOLDER}.\n`;
+
+  async function bundleWithPlaceholder() {
+    const dir = await makeTempRoot("airules-placeholder-bundle-");
+    await writeFile(path.join(dir, SAMPLE_RULE), RULE_WITH_PLACEHOLDER);
+    return dir;
+  }
+
+  test("installRulePack substitutes the detected command", async () => {
+    const bundle = await bundleWithPlaceholder();
+    const rules = await makeTempRoot("airules-placeholder-install-");
+    try {
+      await installRulePack(bundle, rules, [SAMPLE_RULE], "npm test");
+      const installed = await fs.readFile(path.join(rules, SAMPLE_RULE), "utf8");
+      assert.ok(installed.includes("- Then run `npm test`."));
+      assert.ok(!installed.includes(TEST_COMMAND_PLACEHOLDER));
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(rules, { recursive: true, force: true });
+    }
+  });
+
+  test("installRulePack falls back to prose when nothing was detected", async () => {
+    const bundle = await bundleWithPlaceholder();
+    const rules = await makeTempRoot("airules-placeholder-fallback-");
+    try {
+      await installRulePack(bundle, rules, [SAMPLE_RULE], null);
+      const installed = await fs.readFile(path.join(rules, SAMPLE_RULE), "utf8");
+      assert.ok(installed.includes(`- Then run ${UNKNOWN_TEST_COMMAND_TEXT}.`));
+      assert.ok(!installed.includes(TEST_COMMAND_PLACEHOLDER));
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(rules, { recursive: true, force: true });
+    }
+  });
+
+  test("resetRulesDirToBundle renders the restored files", async () => {
+    const bundle = await bundleWithPlaceholder();
+    const root = await makeTempRoot("airules-placeholder-reset-");
+    const rules = path.join(root, ".cursor", "rules", "ai-rules");
+    try {
+      await resetRulesDirToBundle(bundle, rules, "cargo test");
+      const restored = await fs.readFile(path.join(rules, SAMPLE_RULE), "utf8");
+      assert.ok(restored.includes("- Then run `cargo test`."));
+      assert.ok(!restored.includes(TEST_COMMAND_PLACEHOLDER));
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("the Cline and opencode mirrors render the same command", async () => {
+    const bundle = await bundleWithPlaceholder();
+    const workspace = await makeTempRoot("airules-placeholder-mirrors-");
+    try {
+      await syncBundledMdcsToClinerules(workspace, bundle, [SAMPLE_RULE], "pytest");
+      const cline = await fs.readFile(
+        path.join(workspace, ".clinerules", "ai-rules", "ai-rules-code.md"),
+        "utf8"
+      );
+      assert.ok(cline.includes("- Then run `pytest`."));
+
+      await syncBundledMdcsToOpencodeRules(workspace, bundle, [SAMPLE_RULE], "pytest");
+      const opencode = await fs.readFile(
+        path.join(workspace, ".opencode", "rules", "ai-rules", "code.md"),
+        "utf8"
+      );
+      assert.ok(opencode.includes("- Then run `pytest`."));
+      assert.ok(!opencode.includes(TEST_COMMAND_PLACEHOLDER));
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(workspace, { recursive: true, force: true });
     }
   });
 });
@@ -222,7 +304,7 @@ describe("resetRulesDirToBundle", () => {
     const rules = await makeTempRoot("airules-reset-bad-");
     try {
       await assert.rejects(
-        () => resetRulesDirToBundle(bundle, rules),
+        () => resetRulesDirToBundle(bundle, rules, null),
         /Refusing to delete workspace rules folder/
       );
     } finally {
@@ -237,7 +319,7 @@ describe("resetRulesDirToBundle", () => {
     const rules = path.join(root, ".cursor", "rules", "ai-rules");
     try {
       await writeFile(path.join(rules, "orphan.mdc"), "gone\n");
-      await resetRulesDirToBundle(bundle, rules);
+      await resetRulesDirToBundle(bundle, rules, null);
       assert.equal(await pathExists(path.join(rules, "orphan.mdc")), false);
       assert.equal(await isRuleEnabled(rules, SAMPLE_RULE), true);
     } finally {
@@ -254,7 +336,7 @@ describe("resetRulesDirToBundle", () => {
     try {
       await writeFile(outside, "secret\n");
       await fs.symlink(outside, path.join(bundle, "link.mdc"));
-      await resetRulesDirToBundle(bundle, rules);
+      await resetRulesDirToBundle(bundle, rules, null);
       assert.equal(await pathExists(path.join(rules, "link.mdc")), false);
     } finally {
       await fs.rm(bundle, { recursive: true, force: true });
@@ -270,7 +352,7 @@ describe("syncBundledMdcsToClinerules", () => {
     try {
       const dest = path.join(workspace, ".clinerules", "ai-rules");
       await writeFile(path.join(dest, "ai-rules-core.md"), "legacy\n");
-      await syncBundledMdcsToClinerules(workspace, bundle, RULE_FILES);
+      await syncBundledMdcsToClinerules(workspace, bundle, RULE_FILES, null);
       for (const ruleFile of RULE_FILES) {
         const mirror = path.join(dest, `ai-rules-${ruleFile.replace(".mdc", ".md")}`);
         assert.equal(await fs.readFile(mirror, "utf8"), `${ruleFile}\n`);
@@ -385,7 +467,7 @@ describe("syncBundledMdcsToOpencodeRules", () => {
     );
     const workspace = await makeTempRoot("airules-opencode-sync-");
     try {
-      await syncBundledMdcsToOpencodeRules(workspace, bundle, [SAMPLE_RULE]);
+      await syncBundledMdcsToOpencodeRules(workspace, bundle, [SAMPLE_RULE], null);
 
       const mirror = path.join(workspace, ".opencode", "rules", "ai-rules", "code.md");
       assert.equal(
@@ -405,7 +487,7 @@ describe("syncBundledMdcsToOpencodeRules", () => {
     const workspace = await makeTempRoot("airules-opencode-unsafe-ws-");
     try {
       await assert.rejects(
-        () => syncBundledMdcsToOpencodeRules(workspace, bundle, ["../escape.mdc"]),
+        () => syncBundledMdcsToOpencodeRules(workspace, bundle, ["../escape.mdc"], null),
         /Refusing unsafe rule path|Bundled rule missing/
       );
     } finally {
@@ -426,7 +508,7 @@ describe("syncBundledMdcsToOpencodeRules", () => {
       const cursorDir = workspaceRulesDir(workspace);
       await writeFile(path.join(cursorDir, `${SAMPLE_RULE}.disabled`), "off\n");
       await writeFile(path.join(cursorDir, "scope.mdc"), "on\n");
-      await syncBundledMdcsToOpencodeRules(workspace, bundle, [SAMPLE_RULE, "scope.mdc"]);
+      await syncBundledMdcsToOpencodeRules(workspace, bundle, [SAMPLE_RULE, "scope.mdc"], null);
 
       const dest = path.join(workspace, ".opencode", "rules", "ai-rules");
       assert.equal(await pathExists(path.join(dest, "code.md")), false);

@@ -32,15 +32,49 @@ describe("readBundleManifest (shipped pack)", () => {
     assert.deepEqual(manifest.files, RULE_FILES);
   });
 
-  test("ships every topic rule as always-on", async () => {
-    const rules = await Promise.all(
-      RULE_FILES.map((ruleFile) =>
-        fs.readFile(path.join(repoRoot, "bundled", "ai-rules", ruleFile), "utf8")
-      )
+  test("ships behavior rules as always-on and formatting rules as glob-scoped", async () => {
+    // markdown.mdc only applies while editing Markdown, so it costs nothing on
+    // other turns. Every other rule must be live while code is being written.
+    const GLOB_SCOPED = new Set(["markdown.mdc"]);
+
+    for (const ruleFile of RULE_FILES) {
+      const rule = await fs.readFile(
+        path.join(repoRoot, "bundled", "ai-rules", ruleFile),
+        "utf8"
+      );
+      if (GLOB_SCOPED.has(ruleFile)) {
+        assert.match(rule, /^---\n(?:[^\n]*\n)*globs: "[^"]+"\n(?:[^\n]*\n)*---\n/, ruleFile);
+        assert.match(
+          rule,
+          /^---\n(?:[^\n]*\n)*alwaysApply: false\n(?:[^\n]*\n)*---\n/,
+          ruleFile
+        );
+      } else {
+        assert.match(
+          rule,
+          /^---\n(?:[^\n]*\n)*alwaysApply: true\n(?:[^\n]*\n)*---\n/,
+          ruleFile
+        );
+      }
+    }
+  });
+
+  test("ships no placeholder that install-time rendering does not resolve", async () => {
+    const { TEST_COMMAND_PLACEHOLDER, renderRuleBody } = await import(
+      "../out/testCommand.js"
     );
 
-    for (const rule of rules) {
-      assert.match(rule, /^---\n(?:[^\n]*\n)*alwaysApply: true\n(?:[^\n]*\n)*---\n/);
+    for (const ruleFile of RULE_FILES) {
+      const rule = await fs.readFile(
+        path.join(repoRoot, "bundled", "ai-rules", ruleFile),
+        "utf8"
+      );
+      const unknown = rule
+        .replaceAll(TEST_COMMAND_PLACEHOLDER, "")
+        .match(/\{\{[^}]*\}\}|<your [^>]*>/g);
+      assert.equal(unknown, null, `${ruleFile} ships an unrenderable placeholder`);
+      assert.ok(!renderRuleBody(rule, "npm test").includes("{{"), ruleFile);
+      assert.ok(!renderRuleBody(rule, null).includes("{{"), ruleFile);
     }
   });
 });

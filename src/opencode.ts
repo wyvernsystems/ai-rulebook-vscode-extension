@@ -7,6 +7,7 @@ import {
   syncBundledMdcsToOpencodeRules,
   workspaceUsesOpencode,
   type OpencodeConfigMergeResult,
+  type TestCommand,
 } from "./rulesOperations";
 
 function getAiRulesBoolean(key: string, defaultValue: boolean): boolean {
@@ -39,10 +40,11 @@ export async function shouldAutoSyncOpencode(workspaceRoot: string): Promise<boo
 export async function syncRulePackToOpencode(
   workspaceRoot: string,
   bundleDir: string,
-  ruleFiles: readonly string[]
+  ruleFiles: readonly string[],
+  testCommand: TestCommand
 ): Promise<OpencodeConfigMergeResult> {
   await ensureAiRulesIgnored(workspaceRoot);
-  await syncBundledMdcsToOpencodeRules(workspaceRoot, bundleDir, ruleFiles);
+  await syncBundledMdcsToOpencodeRules(workspaceRoot, bundleDir, ruleFiles, testCommand);
   const configPath = await resolveOpencodeConfigPath(workspaceRoot);
   return ensureOpencodeInstructionsEntry(configPath, OPENCODE_RULES_GLOB);
 }

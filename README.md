@@ -7,8 +7,8 @@ docs, Markdown, and Git. A sidebar lets you turn each rule on and off.
 
 ## The rules
 
-- **`scope.mdc`** — change only what the task requires; match the conventions
-  of the file being edited.
+- **`scope.mdc`** — change only what the task requires; tests and docs for
+  that change are in scope; match the conventions of the file being edited.
 - **`code.mdc`** — reuse existing helpers, organize by feature, choose safe
   dependencies, validate input, never log or commit secrets, wrap errors.
 - **`tests.mdc`** — write failing tests for the requirement first, then the
@@ -18,8 +18,14 @@ docs, Markdown, and Git. A sidebar lets you turn each rule on and off.
   `CHANGELOG.md` only when their trigger applies.
 - **`markdown.mdc`** — one H1, no skipped heading levels, `-` bullets,
   language-tagged code fences, inline code for paths and commands, relative
-  links.
+  links. Scoped to `**/*.{md,mdx}`, so it only loads while editing Markdown.
 - **`git.mdc`** — no commits, pushes, or branches unless asked.
+
+`tests.mdc` names your project's own test command. On install the extension
+detects it from a `package.json` `test` script (using the lockfile to pick
+`npm`, `pnpm`, `yarn`, or `bun`), `Cargo.toml`, `go.mod`, pytest
+configuration, or a `test` target in a `Makefile`. When nothing is
+conclusive the rule says "the project's test command" instead of guessing.
 
 ## VS Code
 
@@ -110,6 +116,10 @@ npm run package
 ```
 
 Run `npm run sync-bundled` after editing the source rule files.
+
+Source rules under `.cursor/rules/ai-rules/` hold the `{{TEST_COMMAND}}`
+token verbatim — they are the template the extension renders from, so this
+repo's own working copy shows the token rather than a command.
 
 ## License
 

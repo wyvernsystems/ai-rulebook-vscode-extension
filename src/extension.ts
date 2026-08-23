@@ -24,6 +24,7 @@ import {
   workspaceRulesDir,
 } from "./rulesOperations";
 import { assertContainedPath, isSafeManifestEntry } from "./safePaths";
+import { detectTestCommand } from "./testCommand";
 import { COLOR_RULES_IN_EXPLORER_SETTING, WorkspaceRuleFileColorer } from "./explorerDecorations";
 import {
   bindRulesTreeView,
@@ -109,7 +110,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!isClineInstalled()) {
       return false;
     }
-    await syncBundledMdcsToClinerules(root, bundleDir, mdcs);
+    await syncBundledMdcsToClinerules(root, bundleDir, mdcs, await detectTestCommand(root));
     return true;
   };
 
@@ -118,7 +119,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!(await shouldAutoSyncOpencode(root))) {
       return false;
     }
-    await syncRulePackToOpencode(root, bundleDir, mdcs);
+    await syncRulePackToOpencode(root, bundleDir, mdcs, await detectTestCommand(root));
     return true;
   };
 
@@ -129,11 +130,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (now && !clineWasInstalled && getAiRulesBoolean("autoSyncClineWhenInstalled", true)) {
         const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (root) {
-          void syncBundledMdcsToClinerules(root, bundleDir, mdcs).then(() => {
-            vscode.window.showInformationMessage(
-              "AI Rulebook: Cline detected—synced the rule pack to `.clinerules/ai-rules/`."
-            );
-          });
+          void detectTestCommand(root)
+            .then((testCommand) =>
+              syncBundledMdcsToClinerules(root, bundleDir, mdcs, testCommand)
+            )
+            .then(() => {
+              vscode.window.showInformationMessage(
+                "AI Rulebook: Cline detected—synced the rule pack to `.clinerules/ai-rules/`."
+              );
+            });
         }
       }
       clineWasInstalled = now;
@@ -215,16 +220,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const wantCline =
       getAiRulesBoolean("autoSyncClineWhenInstalled", true) && isClineInstalled();
     const wantOpencode = await shouldAutoSyncOpencode(root);
+    const testCommand = await detectTestCommand(root);
 
     if (!writeCursorRules) {
       // Cline and opencode still mirror independently; only skip the .cursor/ install.
       const parts: string[] = [];
       if (wantCline) {
-        await syncBundledMdcsToClinerules(root, bundleDir, mdcs);
+        await syncBundledMdcsToClinerules(root, bundleDir, mdcs, testCommand);
         parts.push("Cline: synced to `.clinerules/ai-rules/`.");
       }
       if (wantOpencode) {
-        await syncRulePackToOpencode(root, bundleDir, mdcs);
+        await syncRulePackToOpencode(root, bundleDir, mdcs, testCommand);
         parts.push("opencode: synced to `.opencode/rules/ai-rules/`.");
       }
       if (parts.length > 0) {
@@ -241,16 +247,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     await ensureAiRulesIgnored(root);
-    await installRulePack(bundleDir, rulesDir, mdcs);
+    await installRulePack(bundleDir, rulesDir, mdcs, testCommand);
     const parts = [
       "AI Rulebook: installed the rule pack into `.cursor/rules/ai-rules/`.",
     ];
     if (wantCline) {
-      await syncBundledMdcsToClinerules(root, bundleDir, mdcs);
+      await syncBundledMdcsToClinerules(root, bundleDir, mdcs, testCommand);
       parts.push("Cline: synced to `.clinerules/ai-rules/`.");
     }
     if (wantOpencode) {
-      await syncRulePackToOpencode(root, bundleDir, mdcs);
+      await syncRulePackToOpencode(root, bundleDir, mdcs, testCommand);
       parts.push("opencode: synced to `.opencode/rules/ai-rules/`.");
     }
     vscode.window.showInformationMessage(parts.join(" "));
@@ -284,14 +290,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       throw new Error(`Missing bundle at ${bundleDir}`);
     }
     await ensureAiRulesIgnored(root);
-    await installRulePack(bundleDir, rulesDir, mdcs);
+    const testCommand = await detectTestCommand(root);
+    await installRulePack(bundleDir, rulesDir, mdcs, testCommand);
     const parts = ["AI Rulebook: installed the rule pack into `.cursor/rules/ai-rules/`."];
     if (getAiRulesBoolean("autoSyncClineWhenInstalled", true) && isClineInstalled()) {
-      await syncBundledMdcsToClinerules(root, bundleDir, mdcs);
+      await syncBundledMdcsToClinerules(root, bundleDir, mdcs, testCommand);
       parts.push("Cline: synced to `.clinerules/ai-rules/`.");
     }
     if (await shouldAutoSyncOpencode(root)) {
-      await syncRulePackToOpencode(root, bundleDir, mdcs);
+      await syncRulePackToOpencode(root, bundleDir, mdcs, testCommand);
       parts.push("opencode: synced to `.opencode/rules/ai-rules/`.");
     }
     vscode.window.showInformationMessage(parts.join(" "));
@@ -403,7 +410,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   register("aiRules.syncClineWorkspace", async () => {
     const root = ensureWorkspace();
-    await syncBundledMdcsToClinerules(root, bundleDir, mdcs);
+    await syncBundledMdcsToClinerules(root, bundleDir, mdcs, await detectTestCommand(root));
     vscode.window.showInformationMessage(
       "AI Rulebook: wrote the rule pack to `.clinerules/ai-rules/`."
     );
@@ -411,7 +418,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   register("aiRules.syncOpencodeWorkspace", async () => {
     const root = ensureWorkspace();
-    const result = await syncRulePackToOpencode(root, bundleDir, mdcs);
+    const result = await syncRulePackToOpencode(
+      root,
+      bundleDir,
+      mdcs,
+      await detectTestCommand(root)
+    );
     if (result === "skipped") {
       vscode.window.showWarningMessage(
         'AI Rulebook: wrote the rule pack to `.opencode/rules/ai-rules/` but could not ' +
@@ -483,7 +495,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       return;
     }
     await ensureAiRulesIgnored(root);
-    await resetRulesDirToBundle(bundleDir, workspaceRulesDir(root));
+    await resetRulesDirToBundle(bundleDir, workspaceRulesDir(root), await detectTestCommand(root));
     const clineSynced = await maybeAutoSyncCline(root);
     const opencodeSynced = await maybeAutoSyncOpencode(root);
     vscode.window.showInformationMessage(

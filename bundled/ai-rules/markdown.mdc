@@ -1,6 +1,7 @@
 ---
 description: Markdown formatting constraints
-alwaysApply: true
+globs: "**/*.{md,mdx}"
+alwaysApply: false
 ---
 
 # Markdown

@@ -6,6 +6,14 @@ import {
   assertSafeDeletionTarget,
   isSafeManifestEntry,
 } from "./safePaths";
+import { renderRuleBody } from "./testCommand";
+
+/**
+ * Project test command substituted into rule text at write time, or `null`
+ * when the workspace gives no clear signal. Threaded explicitly through every
+ * function that turns bundled rule text into workspace rule text.
+ */
+export type TestCommand = string | null;
 
 const RULES_SUBDIR = "ai-rules";
 const LEGACY_CORE_RULE_FILE = "core.mdc";
@@ -150,7 +158,8 @@ async function bundledRulePath(bundleDir: string, ruleFile: string): Promise<str
 export async function installRulePack(
   bundleDir: string,
   rulesDir: string,
-  ruleFiles: readonly string[]
+  ruleFiles: readonly string[],
+  testCommand: TestCommand
 ): Promise<void> {
   const copies = await Promise.all(
     ruleFiles.map(async (ruleFile) => ({
@@ -162,7 +171,8 @@ export async function installRulePack(
   for (const { source, destination } of copies) {
     await fs.mkdir(path.dirname(destination), { recursive: true });
     await fs.rm(`${destination}.disabled`, { force: true });
-    await fs.copyFile(source, destination);
+    const body = renderRuleBody(await fs.readFile(source, "utf8"), testCommand);
+    await fs.writeFile(destination, body, "utf8");
   }
   const legacyCore = safeJoinUnderBase(rulesDir, LEGACY_CORE_RULE_FILE, "rules directory");
   await fs.rm(legacyCore, { force: true });
@@ -171,18 +181,40 @@ export async function installRulePack(
 
 export async function resetRulesDirToBundle(
   bundleDir: string,
-  rulesDir: string
+  rulesDir: string,
+  testCommand: TestCommand
 ): Promise<void> {
   assertSafeDeletionTarget(rulesDir, RULES_DIR_SEGMENTS, "workspace rules folder");
   await fs.mkdir(path.dirname(rulesDir), { recursive: true });
   await fs.rm(rulesDir, { recursive: true, force: true });
   await copyTreeWithoutSymlinks(bundleDir, rulesDir);
+  await renderRuleTree(rulesDir, testCommand);
+}
+
+/** Rewrites every rule file under `dir` in place with placeholders resolved. */
+async function renderRuleTree(dir: string, testCommand: TestCommand): Promise<void> {
+  for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      await renderRuleTree(full, testCommand);
+      continue;
+    }
+    if (!entry.isFile() || !/\.mdc(\.disabled)?$/.test(entry.name)) {
+      continue;
+    }
+    const original = await fs.readFile(full, "utf8");
+    const rendered = renderRuleBody(original, testCommand);
+    if (rendered !== original) {
+      await fs.writeFile(full, rendered, "utf8");
+    }
+  }
 }
 
 export async function syncBundledMdcsToClinerules(
   workspaceRoot: string,
   bundleDir: string,
-  ruleFiles: readonly string[]
+  ruleFiles: readonly string[],
+  testCommand: TestCommand
 ): Promise<void> {
   await ensureAiRulesIgnored(workspaceRoot);
   const dest = path.join(workspaceRoot, ".clinerules", RULES_SUBDIR);
@@ -198,7 +230,7 @@ export async function syncBundledMdcsToClinerules(
   );
   await fs.mkdir(dest, { recursive: true });
   for (const { source, destination } of mirrors) {
-    const body = await fs.readFile(source, "utf8");
+    const body = renderRuleBody(await fs.readFile(source, "utf8"), testCommand);
     await fs.writeFile(destination, body, "utf8");
   }
   await fs.rm(path.join(dest, "ai-rules-core.md"), { force: true });
@@ -338,7 +370,8 @@ export async function ensureOpencodeInstructionsEntry(
 export async function syncBundledMdcsToOpencodeRules(
   workspaceRoot: string,
   bundleDir: string,
-  ruleFiles: readonly string[]
+  ruleFiles: readonly string[],
+  testCommand: TestCommand
 ): Promise<void> {
   await ensureAiRulesIgnored(workspaceRoot);
   const cursorDir = workspaceRulesDir(workspaceRoot);
@@ -349,7 +382,10 @@ export async function syncBundledMdcsToOpencodeRules(
       const source = await bundledRulePath(bundleDir, ruleFile);
       const enabled = hasCursorRules ? await isRuleEnabled(cursorDir, ruleFile) : true;
       return {
-        body: stripCursorFrontmatter(await fs.readFile(source, "utf8")),
+        body: renderRuleBody(
+          stripCursorFrontmatter(await fs.readFile(source, "utf8")),
+          testCommand
+        ),
         enabled,
         destination: safeJoinUnderBase(
           dest,
