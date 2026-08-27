@@ -25,6 +25,7 @@ Module._load = function loadWithVscodeMock(request, parent, isMain) {
 
 const cursor = await import("../out/cursor.js");
 const cline = await import("../out/cline.js");
+const claude = await import("../out/claude.js");
 const explorerDecorations = await import("../out/explorerDecorations.js");
 const opencode = await import("../out/opencode.js");
 const ruleStatusUi = await import("../out/ruleStatusUi.js");
@@ -231,6 +232,57 @@ describe("opencode detection and sync", () => {
   });
 });
 
+describe("Claude Code detection and sync", () => {
+  const bundleDir = path.join(repoRoot, "bundled", "ai-rules");
+
+  test("shouldAutoSyncClaude honors the setting and workspace evidence", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+    assert.equal(await claude.shouldAutoSyncClaude(root), false);
+
+    await writeFile(path.join(root, "CLAUDE.md"), "# rules\n");
+    assert.equal(await claude.shouldAutoSyncClaude(root), true);
+
+    state.configuration.set("aiRules.autoSyncClaudeWhenInstalled", false);
+    assert.equal(await claude.shouldAutoSyncClaude(root), false);
+  });
+
+  test("syncRulePackToClaude writes converted rules with no config file", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+    await claude.syncRulePackToClaude(root, bundleDir, RULE_FILES);
+
+    const mirror = path.join(root, ".claude", "rules", "ai-rules", "code.md");
+    const body = await fs.readFile(mirror, "utf8");
+    assert.ok(body.length > 0);
+    assert.ok(!body.startsWith("---"));
+    assert.equal(await rulesOperations.pathExists(path.join(root, ".gitignore")), false);
+  });
+
+  test("activate mirrors to Claude Code on a non-Cursor host with workspace evidence", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    await writeFile(path.join(workspaceRoot, "CLAUDE.md"), "# rules\n");
+    const { context } = makeExtensionContext(repoRoot);
+
+    await extension.activate(context);
+
+    assert.equal(
+      await rulesOperations.pathExists(rulesOperations.workspaceRulesDir(workspaceRoot)),
+      false
+    );
+    assert.equal(
+      await rulesOperations.pathExists(
+        path.join(workspaceRoot, ".claude", "rules", "ai-rules", "code.md")
+      ),
+      true
+    );
+  });
+});
+
 describe("WorkspaceRuleFileColorer", () => {
   test("provideFileDecoration returns active styling for a workspace .mdc rule", () => {
     state.workspaceFolderResolver = () => ({ name: "workspace" });
@@ -329,6 +381,22 @@ describe("WorkspaceRuleFileColorer", () => {
     assert.match(active.tooltip, /loaded by opencode/);
     assert.equal(disabled.color.id, "aiRulebook.inactiveForeground");
     assert.match(disabled.tooltip, /not loaded by opencode/);
+  });
+
+  test("provideFileDecoration styles Claude Code rule mirrors", () => {
+    state.workspaceFolderResolver = () => ({ name: "workspace" });
+    const colorer = new explorerDecorations.WorkspaceRuleFileColorer();
+    const active = colorer.provideFileDecoration(
+      Uri.file(path.join("/workspace", ".claude", "rules", "ai-rules", "code.md"))
+    );
+    const disabled = colorer.provideFileDecoration(
+      Uri.file(path.join("/workspace", ".claude", "rules", "ai-rules", "code.md.disabled"))
+    );
+
+    assert.equal(active.color.id, "aiRulebook.activeForeground");
+    assert.match(active.tooltip, /loaded by Claude Code/);
+    assert.equal(disabled.color.id, "aiRulebook.inactiveForeground");
+    assert.match(disabled.tooltip, /not loaded by Claude Code/);
   });
 
   test("provideFileDecoration leaves non-rule .md files outside opencode rules alone", () => {
@@ -537,6 +605,52 @@ describe("bindRulesTreeView", () => {
       false
     );
   });
+
+  test("checkbox changes mirror the toggle to Claude Code when evidence exists", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(root) }];
+    await writeFile(path.join(root, "CLAUDE.md"), "# rules\n");
+    const rulesDir = rulesOperations.workspaceRulesDir(root);
+    await writeFile(
+      path.join(rulesDir, ruleNode.ruleFile),
+      "---\ndescription: x\nalwaysApply: true\n---\n\nBody\n"
+    );
+    await rulesOperations.mirrorRuleToClaudeCode(root, ruleNode.ruleFile, true);
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
+    const context = { subscriptions: [] };
+    const mirror = path.join(root, ".claude", "rules", "ai-rules", "code.md");
+
+    const view = sidebarTreeView.bindRulesTreeView(context, provider, async () => {});
+    await view.emitCheckboxState([[ruleNode, TreeItemCheckboxState.Unchecked]]);
+
+    assert.equal(await rulesOperations.isRuleEnabled(rulesDir, ruleNode.ruleFile), false);
+    assert.equal(await rulesOperations.pathExists(mirror), false);
+    assert.equal(
+      await rulesOperations.pathExists(`${mirror}.disabled`),
+      true
+    );
+  });
+
+  test("checkbox changes skip the Claude Code mirror when no evidence exists", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(root) }];
+    const rulesDir = rulesOperations.workspaceRulesDir(root);
+    await writeFile(path.join(rulesDir, ruleNode.ruleFile));
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
+    const context = { subscriptions: [] };
+
+    const view = sidebarTreeView.bindRulesTreeView(context, provider, async () => {});
+    await view.emitCheckboxState([[ruleNode, TreeItemCheckboxState.Unchecked]]);
+
+    assert.equal(
+      await rulesOperations.pathExists(
+        path.join(root, ".claude", "rules", "ai-rules", "code.md.disabled")
+      ),
+      false
+    );
+  });
 });
 
 describe("rule status UI", () => {
@@ -702,6 +816,32 @@ describe("extension activation", () => {
     await state.registeredCommands.get("aiRules.disableCoreWorkspace")();
 
     const dest = path.join(workspaceRoot, ".opencode", "rules", "ai-rules");
+    for (const ruleFile of RULE_FILES) {
+      const mirrorName = ruleFile.replace(".mdc", ".md");
+      assert.equal(await rulesOperations.pathExists(path.join(dest, mirrorName)), false);
+      assert.equal(
+        await rulesOperations.pathExists(path.join(dest, `${mirrorName}.disabled`)),
+        true
+      );
+    }
+  });
+
+  test("bulk disable mirrors every rule off in the Claude Code folder", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    await writeFile(path.join(workspaceRoot, "CLAUDE.md"), "# rules\n");
+    const rulesDir = rulesOperations.workspaceRulesDir(workspaceRoot);
+    await Promise.all(
+      RULE_FILES.map((ruleFile) => writeFile(path.join(rulesDir, ruleFile)))
+    );
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+
+    await state.registeredCommands.get("aiRules.disableCoreWorkspace")();
+
+    const dest = path.join(workspaceRoot, ".claude", "rules", "ai-rules");
     for (const ruleFile of RULE_FILES) {
       const mirrorName = ruleFile.replace(".mdc", ".md");
       assert.equal(await rulesOperations.pathExists(path.join(dest, mirrorName)), false);

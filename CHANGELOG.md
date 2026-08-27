@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-08-27
+
+### Added
+
+- **Claude Code sync.** The rule pack can now be mirrored to
+  `.claude/rules/ai-rules/` for Claude Code, alongside the existing Cursor,
+  Cline, and opencode targets. Run **AI Rulebook: Sync rule pack to Claude
+  Code**, or let it happen automatically when the workspace shows evidence of
+  Claude Code (`CLAUDE.md`, `CLAUDE.local.md`, or a `.claude/` folder) — gated
+  by the new `aiRules.autoSyncClaudeWhenInstalled` setting. Claude Code
+  auto-discovers every `.md` file under `.claude/rules/`, so unlike opencode
+  this needs no config file registration. The `markdown.mdc` rule's Cursor
+  `globs` scoping is converted to Claude's `paths:` frontmatter so it still
+  only loads for Markdown files.
+
 ## [2.5.2] - 2026-08-23
 
 ### Changed

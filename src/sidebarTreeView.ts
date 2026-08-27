@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
+import { shouldAutoSyncClaude } from "./claude";
 import { shouldAutoSyncOpencode } from "./opencode";
 import {
   isRuleEnabled,
+  mirrorRuleToClaudeCode,
   mirrorRuleToOpencode,
   setRuleEnabled,
   workspaceRulesDir,
@@ -185,6 +187,16 @@ export function bindRulesTreeView(
           const msg = err instanceof Error ? err.message : String(err);
           vscode.window.showErrorMessage(
             `AI Rulebook: opencode mirror for ${node.ruleFile} — ${msg}`
+          );
+        }
+      }
+      if (await shouldAutoSyncClaude(root)) {
+        try {
+          await mirrorRuleToClaudeCode(root, node.ruleFile, enable);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          vscode.window.showErrorMessage(
+            `AI Rulebook: Claude Code mirror for ${node.ruleFile} — ${msg}`
           );
         }
       }

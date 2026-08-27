@@ -39,9 +39,9 @@ details belong in the code or in the rule files.
 - The same green / red scheme is applied to rule files in VS Code's built-in
   Explorer: `<name>.mdc` / `<name>.mdc.disabled` under
   `.cursor/rules/ai-rules/` and `<name>.md` / `<name>.md.disabled` under
-  `.opencode/rules/ai-rules/` in the open workspace. Files that merely end
-  in `.md` elsewhere are not tinted. Gated by
-  `aiRules.colorRulesInExplorer` (default `true`).
+  `.opencode/rules/ai-rules/` or `.claude/rules/ai-rules/` in the open
+  workspace. Files that merely end in `.md` elsewhere are not tinted. Gated
+  by `aiRules.colorRulesInExplorer` (default `true`).
 - A pair of commands toggles the Explorer tint at the User scope without
   touching the sidebar:
   - `AI Rulebook: Hide rule colors` sets
@@ -88,6 +88,24 @@ details belong in the code or in the rule files.
   immediately when opencode evidence exists and
   `aiRules.autoSyncOpencodeWhenInstalled` is on. When the workspace has no
   Cursor rules folder, every opencode rule defaults to enabled.
+- Claude Code mirroring (`.claude/rules/ai-rules/`) is independent of the
+  Cursor install policy: when the workspace shows evidence of Claude Code
+  usage (a `CLAUDE.md`, a `CLAUDE.local.md`, or a `.claude/` folder) and
+  `aiRules.autoSyncClaudeWhenInstalled` is on, the extension mirrors each
+  topic rule into `.claude/rules/ai-rules/` as `<topic>.md` with the Cursor
+  frontmatter converted: a rule's `globs` pattern becomes Claude's `paths:`
+  frontmatter list, and a rule with no `globs` is written frontmatter-free.
+  Claude Code auto-discovers every `.md` file under `.claude/rules/`, so no
+  config file is registered or edited.
+- The `AI Rulebook: Sync rule pack to Claude Code` command runs the Claude
+  Code mirror manually, regardless of the auto-sync gate.
+- The Claude Code mirror reflects the workspace's Cursor rule state: enabled
+  rules are written as `<topic>.md`, disabled rules as `<topic>.md.disabled`
+  (Claude Code only auto-loads `.md` files, so disabled mirrors are skipped).
+  Sidebar checkbox toggles and the enable / disable-all commands update the
+  mirror immediately when Claude Code evidence exists and
+  `aiRules.autoSyncClaudeWhenInstalled` is on. When the workspace has no
+  Cursor rules folder, every Claude Code rule defaults to enabled.
 
 ## Non-functional
 
@@ -102,7 +120,8 @@ details belong in the code or in the rule files.
   tokens, environment variables, or anything outside its allowed paths.
 - The extension only writes inside two well-known locations:
   - the open workspace, under `.cursor/rules/ai-rules/`, (with Cline)
-    `.clinerules/ai-rules/`, and (with opencode) `.opencode/rules/ai-rules/`;
+    `.clinerules/ai-rules/`, (with opencode) `.opencode/rules/ai-rules/`, and
+    (with Claude Code) `.claude/rules/ai-rules/`;
   - the workspace's opencode config file (root `opencode.json` /
     `opencode.jsonc` / `.opencode/opencode.json`), limited to adding the
     generated `instructions` entry;

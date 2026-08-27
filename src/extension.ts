@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { shouldAutoSyncClaude, syncRulePackToClaude } from "./claude";
 import { isClineInstalled } from "./cline";
 import {
   isCursorHost,
@@ -19,6 +20,7 @@ import {
   resetRulesDirToBundle,
   setRuleEnabled,
   syncBundledMdcsToClinerules,
+  syncClaudeMirrorFromWorkspace,
   syncOpencodeMirrorFromWorkspace,
   workspaceRulesDir,
 } from "./rulesOperations";
@@ -122,6 +124,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     return true;
   };
 
+  /** Returns true if the Claude Code mirror was written. */
+  const maybeAutoSyncClaude = async (root: string): Promise<boolean> => {
+    if (!(await shouldAutoSyncClaude(root))) {
+      return false;
+    }
+    await syncRulePackToClaude(root, bundleDir, mdcs, await detectTestCommand(root));
+    return true;
+  };
+
   let clineWasInstalled = isClineInstalled();
   context.subscriptions.push(
     vscode.extensions.onDidChange(() => {
@@ -218,10 +229,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const wantCline =
       getAiRulesBoolean("autoSyncClineWhenInstalled", true) && isClineInstalled();
     const wantOpencode = await shouldAutoSyncOpencode(root);
+    const wantClaude = await shouldAutoSyncClaude(root);
     const testCommand = await detectTestCommand(root);
 
     if (!writeCursorRules) {
-      // Cline and opencode still mirror independently; only skip the .cursor/ install.
+      // Cline, opencode, and Claude Code still mirror independently; only skip the .cursor/ install.
       const parts: string[] = [];
       if (wantCline) {
         await syncBundledMdcsToClinerules(root, bundleDir, mdcs, testCommand);
@@ -230,6 +242,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (wantOpencode) {
         await syncRulePackToOpencode(root, bundleDir, mdcs, testCommand);
         parts.push("opencode: synced to `.opencode/rules/ai-rules/`.");
+      }
+      if (wantClaude) {
+        await syncRulePackToClaude(root, bundleDir, mdcs, testCommand);
+        parts.push("Claude Code: synced to `.claude/rules/ai-rules/`.");
       }
       if (parts.length > 0) {
         vscode.window.showInformationMessage(
@@ -255,6 +271,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (wantOpencode) {
       await syncRulePackToOpencode(root, bundleDir, mdcs, testCommand);
       parts.push("opencode: synced to `.opencode/rules/ai-rules/`.");
+    }
+    if (wantClaude) {
+      await syncRulePackToClaude(root, bundleDir, mdcs, testCommand);
+      parts.push("Claude Code: synced to `.claude/rules/ai-rules/`.");
     }
     vscode.window.showInformationMessage(parts.join(" "));
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
@@ -297,6 +317,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await syncRulePackToOpencode(root, bundleDir, mdcs, testCommand);
       parts.push("opencode: synced to `.opencode/rules/ai-rules/`.");
     }
+    if (await shouldAutoSyncClaude(root)) {
+      await syncRulePackToClaude(root, bundleDir, mdcs, testCommand);
+      parts.push("Claude Code: synced to `.claude/rules/ai-rules/`.");
+    }
     vscode.window.showInformationMessage(parts.join(" "));
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
     treeProvider.refresh();
@@ -330,6 +354,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (await shouldAutoSyncOpencode(root)) {
       await syncOpencodeMirrorFromWorkspace(root, mdcs);
     }
+    if (await shouldAutoSyncClaude(root)) {
+      await syncClaudeMirrorFromWorkspace(root, mdcs);
+    }
     vscode.window.showInformationMessage("AI Rulebook: all rules enabled in this workspace.");
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
     treeProvider.refresh();
@@ -341,6 +368,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await Promise.all(mdcs.map((ruleFile) => setRuleEnabled(rulesDir, ruleFile, false)));
     if (await shouldAutoSyncOpencode(root)) {
       await syncOpencodeMirrorFromWorkspace(root, mdcs);
+    }
+    if (await shouldAutoSyncClaude(root)) {
+      await syncClaudeMirrorFromWorkspace(root, mdcs);
     }
     vscode.window.showInformationMessage("AI Rulebook: all rules disabled in this workspace.");
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
@@ -439,6 +469,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
   });
 
+  register("aiRules.syncClaudeWorkspace", async () => {
+    const root = ensureWorkspace();
+    await syncRulePackToClaude(root, bundleDir, mdcs, await detectTestCommand(root));
+    vscode.window.showInformationMessage(
+      "AI Rulebook: wrote the rule pack to `.claude/rules/ai-rules/`."
+    );
+  });
+
   register("aiRules.refreshTree", async () => {
     treeProvider.refresh();
   });
@@ -493,10 +531,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await resetRulesDirToBundle(bundleDir, workspaceRulesDir(root), await detectTestCommand(root));
     const clineSynced = await maybeAutoSyncCline(root);
     const opencodeSynced = await maybeAutoSyncOpencode(root);
+    const claudeSynced = await maybeAutoSyncClaude(root);
     vscode.window.showInformationMessage(
       "AI Rulebook: workspace rules folder reset to defaults." +
         (clineSynced ? " Cline: synced to `.clinerules/ai-rules/`." : "") +
-        (opencodeSynced ? " opencode: synced to `.opencode/rules/ai-rules/`." : "")
+        (opencodeSynced ? " opencode: synced to `.opencode/rules/ai-rules/`." : "") +
+        (claudeSynced ? " Claude Code: synced to `.claude/rules/ai-rules/`." : "")
     );
     await showRulePackStatusInOutput(rulesOutput, workspaceRulesDir(root), mdcs);
     treeProvider.refresh();

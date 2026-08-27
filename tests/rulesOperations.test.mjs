@@ -5,9 +5,11 @@ import * as path from "node:path";
 import test, { describe } from "node:test";
 
 import {
+  convertCursorRuleToClaudeRule,
   ensureOpencodeInstructionsEntry,
   installRulePack,
   isRuleEnabled,
+  mirrorRuleToClaudeCode,
   mirrorRuleToOpencode,
   OPENCODE_RULES_GLOB,
   pathExists,
@@ -15,10 +17,14 @@ import {
   resolveOpencodeConfigPath,
   setRuleEnabled,
   stripCursorFrontmatter,
+  syncBundledMdcsToClaudeRules,
   syncBundledMdcsToClinerules,
   syncBundledMdcsToOpencodeRules,
+  syncClaudeMirrorFromWorkspace,
   syncOpencodeMirrorFromWorkspace,
+  workspaceClaudeRulesDir,
   workspaceRulesDir,
+  workspaceUsesClaudeCode,
   workspaceUsesOpencode,
 } from "../out/rulesOperations.js";
 import {
@@ -89,7 +95,7 @@ describe("the workspace .gitignore is never touched", () => {
     }
   });
 
-  test("the Cline and opencode mirrors leave an existing .gitignore byte-identical", async () => {
+  test("the Cline, opencode, and Claude Code mirrors leave an existing .gitignore byte-identical", async () => {
     const bundle = await makeMiniBundle();
     const workspace = await makeTempRoot("airules-nogitignore-mirrors-");
     const original = "node_modules/\ndist/\n";
@@ -98,6 +104,7 @@ describe("the workspace .gitignore is never touched", () => {
 
       await syncBundledMdcsToClinerules(workspace, bundle, RULE_FILES, null);
       await syncBundledMdcsToOpencodeRules(workspace, bundle, RULE_FILES, null);
+      await syncBundledMdcsToClaudeRules(workspace, bundle, RULE_FILES, null);
 
       assert.equal(
         await fs.readFile(path.join(workspace, ".gitignore"), "utf8"),
@@ -288,6 +295,14 @@ describe("install-time test command rendering", () => {
       );
       assert.ok(opencode.includes("- Then run `pytest`."));
       assert.ok(!opencode.includes(TEST_COMMAND_PLACEHOLDER));
+
+      await syncBundledMdcsToClaudeRules(workspace, bundle, [SAMPLE_RULE], "pytest");
+      const claude = await fs.readFile(
+        path.join(workspace, ".claude", "rules", "ai-rules", "code.md"),
+        "utf8"
+      );
+      assert.ok(claude.includes("- Then run `pytest`."));
+      assert.ok(!claude.includes(TEST_COMMAND_PLACEHOLDER));
     } finally {
       await fs.rm(bundle, { recursive: true, force: true });
       await fs.rm(workspace, { recursive: true, force: true });
@@ -710,5 +725,190 @@ describe("ensureOpencodeInstructionsEntry", () => {
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("workspaceUsesClaudeCode", () => {
+  test("returns false when no Claude Code files exist", async () => {
+    const root = await makeTempRoot("airules-claude-none-");
+    try {
+      assert.equal(await workspaceUsesClaudeCode(root), false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("recognizes CLAUDE.md, CLAUDE.local.md, and a .claude folder", async () => {
+    const root = await makeTempRoot("airules-claude-evidence-");
+    try {
+      await writeFile(path.join(root, "CLAUDE.md"), "# rules\n");
+      assert.equal(await workspaceUsesClaudeCode(root), true);
+      await fs.rm(path.join(root, "CLAUDE.md"));
+
+      await writeFile(path.join(root, "CLAUDE.local.md"), "# local\n");
+      assert.equal(await workspaceUsesClaudeCode(root), true);
+      await fs.rm(path.join(root, "CLAUDE.local.md"));
+
+      await fs.mkdir(path.join(root, ".claude"));
+      assert.equal(await workspaceUsesClaudeCode(root), true);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("convertCursorRuleToClaudeRule", () => {
+  test("strips frontmatter for a rule with no globs", () => {
+    const body =
+      "---\ndescription: x\nalwaysApply: true\n---\n\n# Code\n\n- Reuse code.\n";
+    assert.equal(convertCursorRuleToClaudeRule(body), "\n# Code\n\n- Reuse code.\n");
+  });
+
+  test("converts a globs pattern into paths: frontmatter", () => {
+    const body =
+      '---\ndescription: x\nglobs: "**/*.{md,mdx}"\nalwaysApply: false\n---\n\n# Markdown\n\nBody\n';
+    assert.equal(
+      convertCursorRuleToClaudeRule(body),
+      '---\npaths:\n  - "**/*.{md,mdx}"\n---\n\n\n# Markdown\n\nBody\n'
+    );
+  });
+
+  test("returns the body unchanged without frontmatter", () => {
+    assert.equal(convertCursorRuleToClaudeRule("# Scope\n"), "# Scope\n");
+  });
+});
+
+describe("syncBundledMdcsToClaudeRules", () => {
+  test("writes converted topic rules as <topic>.md without touching .gitignore", async () => {
+    const bundle = await makeTempRoot("airules-claude-bundle-");
+    await writeFile(
+      path.join(bundle, SAMPLE_RULE),
+      "---\ndescription: x\nalwaysApply: true\n---\n\n# Code\n\n- Reuse code.\n"
+    );
+    const workspace = await makeTempRoot("airules-claude-sync-");
+    try {
+      await syncBundledMdcsToClaudeRules(workspace, bundle, [SAMPLE_RULE], null);
+
+      const mirror = path.join(workspace, ".claude", "rules", "ai-rules", "code.md");
+      assert.equal(await fs.readFile(mirror, "utf8"), "\n# Code\n\n- Reuse code.\n");
+      assert.equal(await pathExists(path.join(workspace, ".gitignore")), false);
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses an unsafe rule path before touching disk", async () => {
+    const bundle = await makeTempRoot("airules-claude-unsafe-");
+    const workspace = await makeTempRoot("airules-claude-unsafe-ws-");
+    try {
+      await assert.rejects(
+        () => syncBundledMdcsToClaudeRules(workspace, bundle, ["../escape.mdc"], null),
+        /Refusing unsafe rule path|Bundled rule missing/
+      );
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("mirrors disabled Cursor rules as .md.disabled", async () => {
+    const bundle = await makeTempRoot("airules-claude-state-bundle-");
+    await writeFile(
+      path.join(bundle, SAMPLE_RULE),
+      "---\ndescription: x\nalwaysApply: true\n---\n\n# Code\n\n- Reuse code.\n"
+    );
+    await writeFile(path.join(bundle, "scope.mdc"), "scope stub\n");
+    const workspace = await makeTempRoot("airules-claude-state-ws-");
+    try {
+      const cursorDir = workspaceRulesDir(workspace);
+      await writeFile(path.join(cursorDir, `${SAMPLE_RULE}.disabled`), "off\n");
+      await writeFile(path.join(cursorDir, "scope.mdc"), "on\n");
+      await syncBundledMdcsToClaudeRules(workspace, bundle, [SAMPLE_RULE, "scope.mdc"], null);
+
+      const dest = path.join(workspace, ".claude", "rules", "ai-rules");
+      assert.equal(await pathExists(path.join(dest, "code.md")), false);
+      assert.equal(
+        await fs.readFile(path.join(dest, "code.md.disabled"), "utf8"),
+        "\n# Code\n\n- Reuse code.\n"
+      );
+      assert.equal(await pathExists(path.join(dest, "scope.md")), true);
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Claude Code mirror state", () => {
+  test("mirrorRuleToClaudeCode writes active and disabled mirrors from the Cursor file", async () => {
+    const workspace = await makeTempRoot("airules-claude-mirror-");
+    try {
+      const cursorDir = workspaceRulesDir(workspace);
+      await writeFile(
+        path.join(cursorDir, SAMPLE_RULE),
+        "---\ndescription: x\nalwaysApply: true\n---\n\nBody\n"
+      );
+      const mirror = path.join(workspace, ".claude", "rules", "ai-rules", "code.md");
+
+      await mirrorRuleToClaudeCode(workspace, SAMPLE_RULE, true);
+      assert.equal(await fs.readFile(mirror, "utf8"), "\nBody\n");
+      assert.equal(await pathExists(`${mirror}.disabled`), false);
+
+      await setRuleEnabled(workspaceRulesDir(workspace), SAMPLE_RULE, false);
+      await mirrorRuleToClaudeCode(workspace, SAMPLE_RULE, false);
+      assert.equal(await pathExists(mirror), false);
+      assert.equal(await fs.readFile(`${mirror}.disabled`, "utf8"), "\nBody\n");
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("mirrorRuleToClaudeCode leaves the mirror untouched when the Cursor source is missing", async () => {
+    const workspace = await makeTempRoot("airules-claude-mirror-missing-");
+    try {
+      await mirrorRuleToClaudeCode(workspace, SAMPLE_RULE, true);
+      const mirror = path.join(workspace, ".claude", "rules", "ai-rules", "code.md");
+      assert.equal(await pathExists(mirror), false);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("syncClaudeMirrorFromWorkspace is a no-op without Cursor rules", async () => {
+    const workspace = await makeTempRoot("airules-claude-mirror-nocursor-");
+    try {
+      await syncClaudeMirrorFromWorkspace(workspace, [SAMPLE_RULE]);
+      assert.equal(
+        await pathExists(path.join(workspace, ".claude", "rules", "ai-rules", "code.md")),
+        false
+      );
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("syncClaudeMirrorFromWorkspace mirrors every rule state", async () => {
+    const workspace = await makeTempRoot("airules-claude-mirror-bulk-");
+    try {
+      const cursorDir = workspaceRulesDir(workspace);
+      await writeFile(path.join(cursorDir, SAMPLE_RULE), "on\n");
+      await writeFile(path.join(cursorDir, "scope.mdc.disabled"), "off\n");
+      await syncClaudeMirrorFromWorkspace(workspace, [SAMPLE_RULE, "scope.mdc"]);
+
+      const dest = path.join(workspace, ".claude", "rules", "ai-rules");
+      assert.equal(await pathExists(path.join(dest, "code.md")), true);
+      assert.equal(await pathExists(path.join(dest, "scope.md")), false);
+      assert.equal(await pathExists(path.join(dest, "scope.md.disabled")), true);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("workspaceClaudeRulesDir", () => {
+  test("uses the expected suffix", () => {
+    const dir = workspaceClaudeRulesDir("/tmp/proj");
+    assert.ok(dir.endsWith(path.join(".claude", "rules", "ai-rules")));
   });
 });

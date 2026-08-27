@@ -4,6 +4,7 @@ import { UI_COLORS } from "./uiPresentation";
 
 const CURSOR_RULES_SEGMENT = `${path.sep}.cursor${path.sep}rules${path.sep}ai-rules${path.sep}`;
 const OPENCODE_RULES_SEGMENT = `${path.sep}.opencode${path.sep}rules${path.sep}ai-rules${path.sep}`;
+const CLAUDE_RULES_SEGMENT = `${path.sep}.claude${path.sep}rules${path.sep}ai-rules${path.sep}`;
 
 const SETTING_ID = "colorRulesInExplorer";
 
@@ -17,7 +18,7 @@ function isEnabled(): boolean {
  * that shows real `file://` URIs) based on whether they live as an active
  * (`<name>.mdc` / `<name>.md`) or disabled (`<name>.mdc.disabled` /
  * `<name>.md.disabled`) rule under any workspace's `.cursor/rules/ai-rules/`
- * or `.opencode/rules/ai-rules/` folder. Sibling to the sidebar tree's
+ * `.opencode/rules/ai-rules/`, or `.claude/rules/ai-rules/` folder. Sibling to the sidebar tree's
  * `RuleStatusDecorationProvider`, which works on synthetic URIs—this one
  * works on the actual files on disk so the same colors show up in the
  * project's file tree.
@@ -35,12 +36,15 @@ export class WorkspaceRuleFileColorer implements vscode.FileDecorationProvider {
     this._onDidChange.fire(uris ?? undefined);
   }
 
-  private static ownerFor(fsPath: string): "Cursor" | "opencode" | undefined {
+  private static ownerFor(fsPath: string): "Cursor" | "opencode" | "Claude Code" | undefined {
     if (fsPath.includes(CURSOR_RULES_SEGMENT)) {
       return "Cursor";
     }
     if (fsPath.includes(OPENCODE_RULES_SEGMENT)) {
       return "opencode";
+    }
+    if (fsPath.includes(CLAUDE_RULES_SEGMENT)) {
+      return "Claude Code";
     }
     return undefined;
   }

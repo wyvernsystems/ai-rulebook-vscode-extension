@@ -103,6 +103,7 @@ describe("VS Code package contributions", () => {
       "aiRules.promptInstallOnUpdate",
       "aiRules.autoSyncClineWhenInstalled",
       "aiRules.autoSyncOpencodeWhenInstalled",
+      "aiRules.autoSyncClaudeWhenInstalled",
     ];
 
     for (const settingId of booleanSettingIds) {

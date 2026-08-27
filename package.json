@@ -1,8 +1,8 @@
 {
   "name": "ai-rulebook",
   "displayName": "AI Rulebook",
-  "description": "AI Rulebook — install and manage focused, always-on engineering rules for Cursor, with optional Cline and opencode sync.",
-  "version": "2.5.2",
+  "description": "AI Rulebook — install and manage focused, always-on engineering rules for Cursor, with optional Cline, opencode, and Claude Code sync.",
+  "version": "2.6.0",
   "publisher": "WyvernSystemsLLC",
   "license": "MIT",
   "icon": "icon.png",
@@ -24,6 +24,7 @@
     "rulebook",
     "cline",
     "opencode",
+    "claude-code",
     "prompt-engineering",
     "code-assistant"
   ],
@@ -74,6 +75,11 @@
       {
         "command": "aiRules.syncOpencodeWorkspace",
         "title": "AI Rulebook: Sync rule pack to opencode",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.syncClaudeWorkspace",
+        "title": "AI Rulebook: Sync rule pack to Claude Code",
         "category": "AI Rulebook"
       },
       {
@@ -230,6 +236,11 @@
           "type": "boolean",
           "default": true,
           "description": "When the workspace shows evidence of opencode usage (an AGENTS.md, an opencode.json/opencode.jsonc, or a .opencode/ folder), automatically mirror the rule pack into .opencode/rules/ai-rules/ and register it in the opencode config's instructions array after install or reset."
+        },
+        "aiRules.autoSyncClaudeWhenInstalled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When the workspace shows evidence of Claude Code usage (a CLAUDE.md, a CLAUDE.local.md, or a .claude/ folder), automatically mirror the rule pack into .claude/rules/ai-rules/ after install or reset. Claude Code auto-discovers every .md file under .claude/rules/, so no config file is touched."
         }
       }
     }

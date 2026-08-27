@@ -2,8 +2,8 @@
 
 AI Rulebook is a VS Code extension that installs a small set of always-on
 engineering rules for AI coding agents into your project. It supports Cursor,
-Cline, and opencode. The six topic rules cover scope, code reuse, testing,
-docs, Markdown, and Git. A sidebar lets you turn each rule on and off.
+Cline, opencode, and Claude Code. The six topic rules cover scope, code reuse,
+testing, docs, Markdown, and Git. A sidebar lets you turn each rule on and off.
 
 ## The rules
 
@@ -45,7 +45,9 @@ conclusive the rule says "the project's test command" instead of guessing.
    `aiRules.installCursorRulesFolder` to `"always"`.
 3. If the project uses opencode (`AGENTS.md`, `opencode.json`, or a
    `.opencode/` folder), the rules are mirrored to opencode automatically.
-4. Toggle rules with the **AI Rulebook** sidebar checkboxes or the
+4. If the project uses Claude Code (`CLAUDE.md`, `CLAUDE.local.md`, or a
+   `.claude/` folder), the rules are mirrored to Claude Code automatically.
+5. Toggle rules with the **AI Rulebook** sidebar checkboxes or the
    command-palette commands.
 
 ## Cursor
@@ -69,7 +71,7 @@ Install the same VSIX in Cursor — it is a VS Code-compatible host.
 1. Install the AI Rulebook extension in VS Code or Cursor:
 
    ```bash
-   code --install-extension ai-rulebook-2.5.2.vsix
+   code --install-extension ai-rulebook-2.6.0.vsix
    ```
 
    or Extensions panel → `...` → **Install from VSIX...**.
@@ -97,11 +99,46 @@ sync: enabled rules stay as `<topic>.md`, disabled rules become
 `.opencode/rules/ai-rules/` yourself and add
 `"instructions": [".opencode/rules/ai-rules/*.md"]` to your `opencode.json`.
 
+## Claude Code
+
+**Set up the rules**
+
+1. Install the AI Rulebook extension in VS Code or Cursor:
+
+   ```bash
+   code --install-extension ai-rulebook-2.6.0.vsix
+   ```
+
+   or Extensions panel → `...` → **Install from VSIX...**.
+2. Open your project folder in that editor.
+3. Open the command palette and run
+   **AI Rulebook: Sync rule pack to Claude Code**. This writes the six rules
+   to `.claude/rules/ai-rules/` as `code.md`, `docs.md`, `git.md`,
+   `markdown.md`, `scope.md`, and `tests.md`. Claude Code auto-discovers every
+   `.md` file under `.claude/rules/`, so no config file needs editing.
+4. Open the project with Claude Code — the rules load automatically. The
+   `markdown.mdc` rule's Cursor `globs` scoping carries over as Claude's
+   `paths:` frontmatter, so it only loads while Claude is working with
+   Markdown files; the rest load every session.
+
+If the project already has Claude Code files (`CLAUDE.md`, `CLAUDE.local.md`,
+or a `.claude/` folder), step 3 happens automatically when you open the
+folder — no manual sync needed.
+
+After setup, toggling rules in the **AI Rulebook** sidebar keeps the mirror in
+sync: enabled rules stay as `<topic>.md`, disabled rules become
+`<topic>.md.disabled` and are skipped.
+
+**Without the extension**: copy the rule files into `.claude/rules/ai-rules/`
+yourself, stripping the Cursor frontmatter (and converting any `globs:` line
+to a `paths:` list) — no config file changes needed.
+
 ## Notes
 
 - Generated rule folders (`.cursor/rules/ai-rules/`,
-  `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`) are left unignored so
-  they can be committed and shared with the team.
+  `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`,
+  `.claude/rules/ai-rules/`) are left unignored so they can be committed and
+  shared with the team.
 - With Cline installed, the rules are mirrored to `.clinerules/ai-rules/`
   automatically.
 - Disable automatic installation with

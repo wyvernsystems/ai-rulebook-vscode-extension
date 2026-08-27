@@ -26,6 +26,11 @@ export function workspaceRulesDir(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".cursor", "rules", RULES_SUBDIR);
 }
 
+/** Claude Code auto-discovers every `.md` file under `.claude/rules/`. */
+export function workspaceClaudeRulesDir(workspaceRoot: string): string {
+  return path.join(workspaceRoot, ".claude", "rules", RULES_SUBDIR);
+}
+
 export async function pathExists(p: string): Promise<boolean> {
   try {
     await fs.access(p);
@@ -343,7 +348,7 @@ export async function syncBundledMdcsToOpencodeRules(
         enabled,
         destination: safeJoinUnderBase(
           dest,
-          opencodeMirrorName(ruleFile),
+          mdcToMdName(ruleFile),
           "opencode rules directory"
         ),
       };
@@ -352,7 +357,7 @@ export async function syncBundledMdcsToOpencodeRules(
   await fs.mkdir(dest, { recursive: true });
   for (const { body, enabled, destination } of mirrors) {
     await fs.mkdir(path.dirname(destination), { recursive: true });
-    await writeOpencodeMirror(destination, body, enabled);
+    await writeRuleMirror(destination, body, enabled);
   }
 }
 
@@ -360,11 +365,17 @@ export function workspaceOpencodeRulesDir(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".opencode", "rules", RULES_SUBDIR);
 }
 
-function opencodeMirrorName(ruleFile: string): string {
+/** `<topic>.mdc` -> `<topic>.md`, shared by the opencode and Claude Code mirrors. */
+function mdcToMdName(ruleFile: string): string {
   return `${ruleFile.replace(/\.mdc$/, "")}.md`;
 }
 
-async function writeOpencodeMirror(
+/**
+ * Writes a mirrored rule as `<name>` when enabled or `<name>.disabled` when
+ * not, removing whichever counterpart existed. Shared by the opencode and
+ * Claude Code mirrors, which use the same enabled/disabled convention.
+ */
+async function writeRuleMirror(
   destination: string,
   body: string,
   enabled: boolean
@@ -401,11 +412,11 @@ export async function mirrorRuleToOpencode(
   const body = stripCursorFrontmatter(await fs.readFile(sourcePath, "utf8"));
   const destination = safeJoinUnderBase(
     workspaceOpencodeRulesDir(workspaceRoot),
-    opencodeMirrorName(ruleFile),
+    mdcToMdName(ruleFile),
     "opencode rules directory"
   );
   await fs.mkdir(path.dirname(destination), { recursive: true });
-  await writeOpencodeMirror(destination, body, enabled);
+  await writeRuleMirror(destination, body, enabled);
 }
 
 /**
@@ -423,6 +434,167 @@ export async function syncOpencodeMirrorFromWorkspace(
   }
   for (const ruleFile of ruleFiles) {
     await mirrorRuleToOpencode(workspaceRoot, ruleFile, await isRuleEnabled(cursorDir, ruleFile));
+  }
+}
+
+/**
+ * True when the workspace shows evidence of Claude Code usage: a `CLAUDE.md`,
+ * a `CLAUDE.local.md`, or a `.claude/` directory at the root. Used to gate the
+ * automatic Claude Code sync (the manual command ignores this check).
+ */
+export async function workspaceUsesClaudeCode(workspaceRoot: string): Promise<boolean> {
+  const candidates = [
+    path.join(workspaceRoot, "CLAUDE.md"),
+    path.join(workspaceRoot, "CLAUDE.local.md"),
+    path.join(workspaceRoot, ".claude"),
+  ];
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Parses the leading Cursor frontmatter block into field -> value pairs, or
+ * `null` when the body has none or the block is unterminated. Only used to
+ * read `globs`; not a general YAML parser.
+ */
+function parseCursorFrontmatterFields(body: string): Record<string, string> | null {
+  const firstBreak = body.search(/\r?\n/);
+  const firstLine = firstBreak === -1 ? body : body.slice(0, firstBreak);
+  if (firstLine.trim() !== "---") {
+    return null;
+  }
+  const lines = body.split(/\r?\n/);
+  const fields: Record<string, string> = {};
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === "---") {
+      return fields;
+    }
+    const match = /^(\w+):\s*(.*)$/.exec(lines[i]);
+    if (!match) {
+      continue;
+    }
+    let value = match[2].trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    fields[match[1]] = value;
+  }
+  return null;
+}
+
+/**
+ * Converts a Cursor `.mdc` rule body into a Claude Code `.claude/rules/`
+ * body: strips the Cursor frontmatter and, when the rule declared a `globs`
+ * pattern, replaces it with the equivalent Claude `paths:` frontmatter so the
+ * rule only loads for matching files. Claude has no `alwaysApply` field —
+ * omitting `paths` already means "always load", matching Cursor's default.
+ */
+export function convertCursorRuleToClaudeRule(body: string): string {
+  const fields = parseCursorFrontmatterFields(body);
+  const rest = stripCursorFrontmatter(body);
+  const globs = fields?.globs;
+  if (!globs) {
+    return rest;
+  }
+  return `---\npaths:\n  - ${JSON.stringify(globs)}\n---\n\n${rest}`;
+}
+
+/**
+ * Copies each bundled rule into `.claude/rules/ai-rules/` as a plain
+ * `<topic>.md` file with the Cursor frontmatter converted to Claude's `paths:`
+ * form, and keeps the generated folder out of source control. The mirror
+ * reflects the workspace's Cursor rule state: enabled rules are written as
+ * `<topic>.md`, disabled ones as `<topic>.md.disabled` (Claude Code only
+ * auto-loads `.md` files, so disabled mirrors are skipped without any config
+ * registration). When the workspace has no Cursor rules folder yet, every
+ * rule defaults to enabled.
+ */
+export async function syncBundledMdcsToClaudeRules(
+  workspaceRoot: string,
+  bundleDir: string,
+  ruleFiles: readonly string[],
+  testCommand: TestCommand
+): Promise<void> {
+  const cursorDir = workspaceRulesDir(workspaceRoot);
+  const hasCursorRules = await pathExists(cursorDir);
+  const dest = workspaceClaudeRulesDir(workspaceRoot);
+  const mirrors = await Promise.all(
+    ruleFiles.map(async (ruleFile) => {
+      const source = await bundledRulePath(bundleDir, ruleFile);
+      const enabled = hasCursorRules ? await isRuleEnabled(cursorDir, ruleFile) : true;
+      return {
+        body: renderRuleBody(
+          convertCursorRuleToClaudeRule(await fs.readFile(source, "utf8")),
+          testCommand
+        ),
+        enabled,
+        destination: safeJoinUnderBase(
+          dest,
+          mdcToMdName(ruleFile),
+          "Claude Code rules directory"
+        ),
+      };
+    })
+  );
+  await fs.mkdir(dest, { recursive: true });
+  for (const { body, enabled, destination } of mirrors) {
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await writeRuleMirror(destination, body, enabled);
+  }
+}
+
+/**
+ * Mirrors one rule into `.claude/rules/ai-rules/` from the workspace's
+ * Cursor rule file (`<topic>.mdc` when enabled, `<topic>.mdc.disabled` when
+ * off), with the frontmatter converted. Used to keep the Claude Code mirror
+ * in sync immediately after a sidebar toggle.
+ */
+export async function mirrorRuleToClaudeCode(
+  workspaceRoot: string,
+  ruleFile: string,
+  enabled: boolean
+): Promise<void> {
+  const cursorActive = safeJoinUnderBase(
+    workspaceRulesDir(workspaceRoot),
+    ruleFile,
+    "rules directory"
+  );
+  const sourcePath = enabled ? cursorActive : `${cursorActive}.disabled`;
+  if (!(await pathExists(sourcePath))) {
+    return;
+  }
+  const body = convertCursorRuleToClaudeRule(await fs.readFile(sourcePath, "utf8"));
+  const destination = safeJoinUnderBase(
+    workspaceClaudeRulesDir(workspaceRoot),
+    mdcToMdName(ruleFile),
+    "Claude Code rules directory"
+  );
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await writeRuleMirror(destination, body, enabled);
+}
+
+/**
+ * Rewrites the whole Claude Code mirror from the workspace's current Cursor
+ * rule state. No-op when the workspace has no Cursor rules folder. Used after
+ * bulk enable / disable commands.
+ */
+export async function syncClaudeMirrorFromWorkspace(
+  workspaceRoot: string,
+  ruleFiles: readonly string[]
+): Promise<void> {
+  const cursorDir = workspaceRulesDir(workspaceRoot);
+  if (!(await pathExists(cursorDir))) {
+    return;
+  }
+  for (const ruleFile of ruleFiles) {
+    await mirrorRuleToClaudeCode(workspaceRoot, ruleFile, await isRuleEnabled(cursorDir, ruleFile));
   }
 }
 
