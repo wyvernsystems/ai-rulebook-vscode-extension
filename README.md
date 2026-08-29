@@ -88,7 +88,7 @@ Install the same VSIX in Cursor — it is a VS Code-compatible host.
 1. Install the AI Rulebook extension in VS Code or Cursor:
 
    ```bash
-   code --install-extension ai-rulebook-2.6.0.vsix
+   code --install-extension ai-rulebook-2.7.0.vsix
    ```
 
    or Extensions panel → `...` → **Install from VSIX...**.
@@ -124,7 +124,7 @@ sync: enabled rules stay as `<topic>.md`, disabled rules become
 1. Install the AI Rulebook extension in VS Code or Cursor:
 
    ```bash
-   code --install-extension ai-rulebook-2.6.0.vsix
+   code --install-extension ai-rulebook-2.7.0.vsix
    ```
 
    or Extensions panel → `...` → **Install from VSIX...**.

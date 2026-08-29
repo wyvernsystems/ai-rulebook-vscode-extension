@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-08-29
+
 ### Added
 
 - **Standalone rule packs.** `bundled/rule-packs/` now ships in this repo
