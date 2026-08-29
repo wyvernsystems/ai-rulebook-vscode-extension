@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-08-29
+
 ### Added
 
 - **Status bar item.** Shows the enabled-rule count for the first workspace
