@@ -39,9 +39,15 @@ details belong in the code or in the rule files.
 - The same green / red scheme is applied to rule files in VS Code's built-in
   Explorer: `<name>.mdc` / `<name>.mdc.disabled` under
   `.cursor/rules/ai-rules/` and `<name>.md` / `<name>.md.disabled` under
-  `.opencode/rules/ai-rules/` or `.claude/rules/ai-rules/` in the open
-  workspace. Files that merely end in `.md` elsewhere are not tinted. Gated
-  by `aiRules.colorRulesInExplorer` (default `true`).
+  `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`, or
+  `.claude/rules/ai-rules/` in the open workspace. Files that merely end in
+  `.md` elsewhere are not tinted. Gated by `aiRules.colorRulesInExplorer`
+  (default `true`).
+- A status bar item shows the enabled-rule count for the first workspace
+  folder (`AI 5/6`) plus the opencode config sync state (`✓` synced, `✗`
+  skipped). Clicking it runs `AI Rulebook: Sync rule pack to opencode`. It is
+  populated on activation and refreshed after every action that changes rule
+  state.
 - A pair of commands toggles the Explorer tint at the User scope without
   touching the sidebar:
   - `AI Rulebook: Hide rule colors` sets
@@ -81,7 +87,14 @@ details belong in the code or in the rule files.
 - When Cline is installed (`saoudrizwan.claude-dev` or
   `saoudrizwan.cline-nightly`) and `aiRules.autoSyncClineWhenInstalled` is
   on, the extension mirrors each topic rule into `.clinerules/ai-rules/` as
-  `ai-rules-<topic>.md` after install, reset, manual sync, and first detection.
+  `ai-rules-<topic>.md` after install, reset, manual sync, and first
+  detection. In a multi-root workspace this mirroring, the opencode and
+  Claude Code mirroring, and their manual sync commands (`AI Rulebook: Sync
+  rule pack to Cline` / `...to opencode` / `...to Claude Code`) run
+  independently in every open folder — each folder is judged on its own
+  evidence and its own Cursor rule state. Only the `.cursor/rules/ai-rules/`
+  install itself (auto-install, `AI Rulebook: Install / update rule pack`,
+  and the sidebar) is scoped to the first workspace folder.
 - The Cline mirror reflects the workspace's Cursor rule state: enabled rules
   are written as `ai-rules-<topic>.md`, disabled rules as
   `ai-rules-<topic>.md.disabled` (Cline only reads `.md` files, so disabled
@@ -100,7 +113,14 @@ details belong in the code or in the rule files.
   project's opencode config (root `opencode.json`, then `opencode.jsonc`,
   then `.opencode/opencode.json`; the last is created when none exists).
   The config edit preserves JSONC comments and trailing commas; a config
-  that cannot be parsed safely is left untouched and the user is warned.
+  that cannot be parsed safely is left untouched and the user is warned —
+  whether the sync ran automatically on workspace open or via the manual
+  command.
+- Syncing to opencode also writes a `/ai-rulebook` command file to
+  `.opencode/command/ai-rulebook.md` that lists the active and disabled
+  rules from `.opencode/rules/ai-rules/`, so opencode users can inspect rule
+  state without opening VS Code. `AI Rulebook: Remove opencode rules` and
+  `AI Rulebook: Remove all rule packs` delete it alongside the rule mirror.
 - The `AI Rulebook: Sync rule pack to opencode` command runs the opencode
   mirror manually, regardless of the auto-sync gate.
 - The opencode mirror reflects the workspace's Cursor rule state: enabled

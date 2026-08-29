@@ -177,6 +177,111 @@ describe("opencode detection and sync", () => {
     );
     assert.deepEqual(config.instructions, [".opencode/rules/ai-rules/*.md"]);
     assert.equal(await rulesOperations.pathExists(path.join(root, ".gitignore")), false);
+
+    const commandFile = path.join(root, ".opencode", "command", "ai-rulebook.md");
+    const commandBody = await fs.readFile(commandFile, "utf8");
+    assert.ok(commandBody.startsWith("---"));
+    assert.match(commandBody, /description:/);
+  });
+
+  test("opencodeSyncStatus reports none, synced, and skipped states", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+    assert.equal(await opencode.opencodeSyncStatus(root), "none");
+
+    await writeFile(path.join(root, "AGENTS.md"), "# rules\n");
+    assert.equal(await opencode.opencodeSyncStatus(root), "none");
+
+    await opencode.syncRulePackToOpencode(root, bundleDir, RULE_FILES);
+    assert.equal(await opencode.opencodeSyncStatus(root), "synced");
+
+    await writeFile(path.join(root, "opencode.json"), "{\n  instructions: [\n");
+    assert.equal(await opencode.opencodeSyncStatus(root), "skipped");
+  });
+
+  test("removeOpencodeCommandFile removes the /ai-rulebook command and is idempotent", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    await opencode.syncRulePackToOpencode(root, bundleDir, RULE_FILES);
+    const commandFile = path.join(root, ".opencode", "command", "ai-rulebook.md");
+    assert.equal(await rulesOperations.pathExists(commandFile), true);
+
+    await opencode.removeOpencodeCommandFile(root);
+    assert.equal(await rulesOperations.pathExists(commandFile), false);
+
+    await assert.doesNotReject(opencode.removeOpencodeCommandFile(root));
+  });
+
+  test("auto-sync warns when the opencode config cannot be updated", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    await writeFile(path.join(workspaceRoot, "AGENTS.md"), "# rules\n");
+    await writeFile(path.join(workspaceRoot, "opencode.json"), "{\n  instructions: [\n");
+    const { context } = makeExtensionContext(repoRoot);
+
+    await extension.activate(context);
+
+    assert.ok(
+      state.warnings.some((message) => /add "instructions"/i.test(message)),
+      `expected an auto-sync warning, got: ${state.warnings.join(" | ")}`
+    );
+    assert.equal(
+      await fs.readFile(path.join(workspaceRoot, "opencode.json"), "utf8"),
+      "{\n  instructions: [\n"
+    );
+  });
+
+  test("syncOpencodeWorkspace mirrors into every workspace folder", async (t) => {
+    const rootA = await makeTempWorkspace();
+    const rootB = await makeTempWorkspace();
+    t.after(() => {
+      fs.rm(rootA, { recursive: true, force: true });
+      fs.rm(rootB, { recursive: true, force: true });
+    });
+    workspace.workspaceFolders = [{ uri: Uri.file(rootA) }, { uri: Uri.file(rootB) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+
+    await state.registeredCommands.get("aiRules.syncOpencodeWorkspace")();
+
+    for (const root of [rootA, rootB]) {
+      assert.equal(
+        await rulesOperations.pathExists(
+          path.join(root, ".opencode", "rules", "ai-rules", "code.md")
+        ),
+        true
+      );
+      const commandFile = path.join(root, ".opencode", "command", "ai-rulebook.md");
+      assert.equal(await rulesOperations.pathExists(commandFile), true);
+    }
+  });
+
+  test("activate mirrors opencode only into folders with opencode evidence", async (t) => {
+    const rootA = await makeTempWorkspace();
+    const rootB = await makeTempWorkspace();
+    t.after(() => {
+      fs.rm(rootA, { recursive: true, force: true });
+      fs.rm(rootB, { recursive: true, force: true });
+    });
+    workspace.workspaceFolders = [{ uri: Uri.file(rootA) }, { uri: Uri.file(rootB) }];
+    await writeFile(path.join(rootA, "AGENTS.md"), "# rules\n");
+    const { context } = makeExtensionContext(repoRoot);
+
+    await extension.activate(context);
+
+    assert.equal(
+      await rulesOperations.pathExists(
+        path.join(rootA, ".opencode", "rules", "ai-rules", "code.md")
+      ),
+      true
+    );
+    assert.equal(
+      await rulesOperations.pathExists(path.join(rootB, ".opencode")),
+      false
+    );
   });
 
   test("activate mirrors to opencode on a non-Cursor host with workspace evidence", async (t) => {
@@ -575,7 +680,14 @@ describe("bindRulesTreeView", () => {
     const context = { subscriptions: [] };
     const mirror = path.join(root, ".opencode", "rules", "ai-rules", "code.md");
 
-    const view = sidebarTreeView.bindRulesTreeView(context, provider, async () => {});
+    const view = sidebarTreeView.bindRulesTreeView(
+      context,
+      provider,
+      async () => {},
+      async (ruleFile, enabled) => {
+        await rulesOperations.mirrorRuleToOpencode(root, ruleFile, enabled);
+      }
+    );
     await view.emitCheckboxState([[ruleNode, TreeItemCheckboxState.Unchecked]]);
 
     assert.equal(await rulesOperations.isRuleEnabled(rulesDir, ruleNode.ruleFile), false);
@@ -621,7 +733,14 @@ describe("bindRulesTreeView", () => {
     const context = { subscriptions: [] };
     const mirror = path.join(root, ".claude", "rules", "ai-rules", "code.md");
 
-    const view = sidebarTreeView.bindRulesTreeView(context, provider, async () => {});
+    const view = sidebarTreeView.bindRulesTreeView(
+      context,
+      provider,
+      async () => {},
+      async (ruleFile, enabled) => {
+        await rulesOperations.mirrorRuleToClaudeCode(root, ruleFile, enabled);
+      }
+    );
     await view.emitCheckboxState([[ruleNode, TreeItemCheckboxState.Unchecked]]);
 
     assert.equal(await rulesOperations.isRuleEnabled(rulesDir, ruleNode.ruleFile), false);
@@ -667,7 +786,14 @@ describe("bindRulesTreeView", () => {
     const context = { subscriptions: [] };
     const mirror = path.join(root, ".clinerules", "ai-rules", "ai-rules-code.md");
 
-    const view = sidebarTreeView.bindRulesTreeView(context, provider, async () => {});
+    const view = sidebarTreeView.bindRulesTreeView(
+      context,
+      provider,
+      async () => {},
+      async (ruleFile, enabled) => {
+        await rulesOperations.mirrorRuleToCline(root, ruleFile, enabled);
+      }
+    );
     await view.emitCheckboxState([[ruleNode, TreeItemCheckboxState.Unchecked]]);
 
     assert.equal(await rulesOperations.isRuleEnabled(rulesDir, ruleNode.ruleFile), false);
@@ -800,6 +926,81 @@ describe("extension activation", () => {
     assert.equal(await rulesOperations.pathExists(path.join(workspaceRoot, ".gitignore")), false);
   });
 
+  test("activate populates the status bar even when the rules folder already exists", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    const rulesDir = rulesOperations.workspaceRulesDir(workspaceRoot);
+    await Promise.all(
+      RULE_FILES.map((ruleFile) => writeFile(path.join(rulesDir, ruleFile)))
+    );
+    const { context } = makeExtensionContext(repoRoot);
+
+    await extension.activate(context);
+
+    assert.equal(state.statusBarItems.length, 1);
+    assert.match(
+      state.statusBarItems[0].text,
+      new RegExp(`${RULE_FILES.length}/${RULE_FILES.length}`)
+    );
+  });
+
+  test("installWorkspace syncs opencode into every folder with evidence, not just the first", async (t) => {
+    const rootA = await makeTempWorkspace();
+    const rootB = await makeTempWorkspace();
+    t.after(() => {
+      fs.rm(rootA, { recursive: true, force: true });
+      fs.rm(rootB, { recursive: true, force: true });
+    });
+    workspace.workspaceFolders = [{ uri: Uri.file(rootA) }, { uri: Uri.file(rootB) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    await writeFile(path.join(rootA, "AGENTS.md"), "# rules\n");
+    await writeFile(path.join(rootB, "AGENTS.md"), "# rules\n");
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+
+    await state.registeredCommands.get("aiRules.installWorkspace")();
+
+    for (const root of [rootA, rootB]) {
+      assert.equal(
+        await rulesOperations.pathExists(path.join(root, ".opencode", "rules", "ai-rules", "code.md")),
+        true,
+        `expected ${root} to get the opencode mirror`
+      );
+    }
+  });
+
+  test("syncClineWorkspace and syncClaudeWorkspace mirror into every workspace folder", async (t) => {
+    const rootA = await makeTempWorkspace();
+    const rootB = await makeTempWorkspace();
+    t.after(() => {
+      fs.rm(rootA, { recursive: true, force: true });
+      fs.rm(rootB, { recursive: true, force: true });
+    });
+    workspace.workspaceFolders = [{ uri: Uri.file(rootA) }, { uri: Uri.file(rootB) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+
+    await state.registeredCommands.get("aiRules.syncClineWorkspace")();
+    await state.registeredCommands.get("aiRules.syncClaudeWorkspace")();
+
+    for (const root of [rootA, rootB]) {
+      assert.equal(
+        await rulesOperations.pathExists(
+          path.join(root, ".clinerules", "ai-rules", "ai-rules-code.md")
+        ),
+        true,
+        `expected ${root} to get the Cline mirror`
+      );
+      assert.equal(
+        await rulesOperations.pathExists(path.join(root, ".claude", "rules", "ai-rules", "code.md")),
+        true,
+        `expected ${root} to get the Claude Code mirror`
+      );
+    }
+  });
+
   test("workspace pack commands disable and enable every topic rule", async (t) => {
     const workspaceRoot = await makeTempWorkspace();
     t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
@@ -879,6 +1080,48 @@ describe("extension activation", () => {
     assert.equal(await rulesOperations.pathExists(clineMirror), true);
     assert.equal(await rulesOperations.pathExists(opencodeMirror), true);
     assert.equal(await rulesOperations.pathExists(claudeMirror), true);
+  });
+
+  test("toggling a rule in one workspace folder does not touch another folder's mirror state", async (t) => {
+    const rootA = await makeTempWorkspace();
+    const rootB = await makeTempWorkspace();
+    t.after(() => {
+      fs.rm(rootA, { recursive: true, force: true });
+      fs.rm(rootB, { recursive: true, force: true });
+    });
+    workspace.workspaceFolders = [{ uri: Uri.file(rootA) }, { uri: Uri.file(rootB) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    const bundleDir = path.join(repoRoot, "bundled", "ai-rules");
+    for (const root of [rootA, rootB]) {
+      await writeFile(path.join(root, "AGENTS.md"), "# rules\n");
+      const rulesDir = rulesOperations.workspaceRulesDir(root);
+      await Promise.all(RULE_FILES.map((ruleFile) => writeFile(path.join(rulesDir, ruleFile))));
+    }
+    // Seed folder B's opencode mirror as enabled, matching its own (untouched) Cursor state.
+    await opencode.syncRulePackToOpencode(rootB, bundleDir, RULE_FILES);
+    const opencodeMirrorB = path.join(rootB, ".opencode", "rules", "ai-rules", SAMPLE_RULE.replace(".mdc", ".md"));
+    assert.equal(await rulesOperations.pathExists(opencodeMirrorB), true);
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+    state.quickPickSelection = SAMPLE_RULE;
+
+    await state.registeredCommands.get("aiRules.disableRuleWorkspace")();
+
+    const rulesDirA = rulesOperations.workspaceRulesDir(rootA);
+    assert.equal(await rulesOperations.isRuleEnabled(rulesDirA, SAMPLE_RULE), false);
+
+    const rulesDirB = rulesOperations.workspaceRulesDir(rootB);
+    assert.equal(
+      await rulesOperations.isRuleEnabled(rulesDirB, SAMPLE_RULE),
+      true,
+      "folder B's own Cursor rule state was never touched by the toggle"
+    );
+    assert.equal(
+      await rulesOperations.pathExists(opencodeMirrorB),
+      true,
+      "folder B's opencode mirror must stay enabled since its own rule state didn't change"
+    );
+    assert.equal(await rulesOperations.pathExists(`${opencodeMirrorB}.disabled`), false);
   });
 
   test("bulk disable mirrors every rule off in the opencode folder", async (t) => {

@@ -8,6 +8,7 @@ export const state = {
   outputChannels: [],
   treeViews: [],
   decorationProviders: [],
+  statusBarItems: [],
   registeredCommands: new Map(),
   executedCommands: [],
   quickPickRequests: [],
@@ -130,6 +131,26 @@ export const TreeItemCheckboxState = {
   Checked: 1,
 };
 
+class StatusBarItem {
+  text = "";
+  tooltip = "";
+  command;
+  name = "";
+
+  show() {
+    state.statusBarItems.push(this);
+  }
+
+  hide() {}
+
+  dispose() {}
+}
+
+export const StatusBarAlignment = {
+  Left: 1,
+  Right: 2,
+};
+
 export const env = {
   uriScheme: "vscode",
   appName: "Visual Studio Code",
@@ -187,6 +208,13 @@ export const window = {
     return { dispose() {} };
   },
 
+  createStatusBarItem(alignment, priority) {
+    const item = new StatusBarItem();
+    item.alignment = alignment;
+    item.priority = priority;
+    return item;
+  },
+
   async showQuickPick(items, options) {
     state.quickPickRequests.push({ items, options });
     return state.quickPickSelection;
@@ -228,6 +256,7 @@ export function resetVscodeMock() {
   state.outputChannels = [];
   state.treeViews = [];
   state.decorationProviders = [];
+  state.statusBarItems = [];
   state.registeredCommands.clear();
   state.executedCommands = [];
   state.quickPickRequests = [];
@@ -240,6 +269,7 @@ export function resetVscodeMock() {
 export const vscode = {
   EventEmitter,
   MarkdownString,
+  StatusBarAlignment,
   ThemeColor,
   ThemeIcon,
   TreeItem,

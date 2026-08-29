@@ -104,6 +104,9 @@ Install the same VSIX in Cursor — it is a VS Code-compatible host.
 5. Restart opencode and open the project — the rules load alongside
    `AGENTS.md`.
 
+Step 3 also writes `.opencode/command/ai-rulebook.md`, a `/ai-rulebook`
+command that lists the active and disabled rules from inside opencode.
+
 If the project already has opencode files (`AGENTS.md`, `opencode.json`, or a
 `.opencode/` folder), step 3 happens automatically when you open the folder —
 no manual sync needed.
@@ -168,6 +171,12 @@ sync: enabled rules stay as `<topic>.md`, disabled rules become
   `aiRules.autoInstallOnOpenWorkspace: false`.
 - Rule files installed under `.cursor/rules/ai-rules/` are editable; the
   extension only overwrites them on install, update, or reset.
+- A status bar item shows the enabled-rule count (`AI 5/6`) and the opencode
+  config sync state; click it to run **Sync rule pack to opencode**.
+- In a multi-root workspace, Cline/opencode/Claude Code mirroring and their
+  manual sync commands run in every open folder that shows evidence for that
+  tool. The `.cursor/rules/ai-rules/` install itself — and the sidebar rule
+  toggles — apply to the first workspace folder only.
 
 ## Development
 

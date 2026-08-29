@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { UI_COLORS } from "./uiPresentation";
 
 const CURSOR_RULES_SEGMENT = `${path.sep}.cursor${path.sep}rules${path.sep}ai-rules${path.sep}`;
+const CLINE_RULES_SEGMENT = `${path.sep}.clinerules${path.sep}ai-rules${path.sep}`;
 const OPENCODE_RULES_SEGMENT = `${path.sep}.opencode${path.sep}rules${path.sep}ai-rules${path.sep}`;
 const CLAUDE_RULES_SEGMENT = `${path.sep}.claude${path.sep}rules${path.sep}ai-rules${path.sep}`;
 
@@ -17,8 +18,9 @@ function isEnabled(): boolean {
  * Tints rule files green / red in the workbench Explorer (and any other view
  * that shows real `file://` URIs) based on whether they live as an active
  * (`<name>.mdc` / `<name>.md`) or disabled (`<name>.mdc.disabled` /
- * `<name>.md.disabled`) rule under any workspace's `.cursor/rules/ai-rules/`
- * `.opencode/rules/ai-rules/`, or `.claude/rules/ai-rules/` folder. Sibling to the sidebar tree's
+ * `<name>.md.disabled`) rule under any workspace's `.cursor/rules/ai-rules/`,
+ * `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`, or
+ * `.claude/rules/ai-rules/` folder. Sibling to the sidebar tree's
  * `RuleStatusDecorationProvider`, which works on synthetic URIs—this one
  * works on the actual files on disk so the same colors show up in the
  * project's file tree.
@@ -36,9 +38,14 @@ export class WorkspaceRuleFileColorer implements vscode.FileDecorationProvider {
     this._onDidChange.fire(uris ?? undefined);
   }
 
-  private static ownerFor(fsPath: string): "Cursor" | "opencode" | "Claude Code" | undefined {
+  private static ownerFor(
+    fsPath: string
+  ): "Cursor" | "Cline" | "opencode" | "Claude Code" | undefined {
     if (fsPath.includes(CURSOR_RULES_SEGMENT)) {
       return "Cursor";
+    }
+    if (fsPath.includes(CLINE_RULES_SEGMENT)) {
+      return "Cline";
     }
     if (fsPath.includes(OPENCODE_RULES_SEGMENT)) {
       return "opencode";

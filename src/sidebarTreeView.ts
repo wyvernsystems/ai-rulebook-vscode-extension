@@ -1,12 +1,6 @@
 import * as vscode from "vscode";
-import { shouldAutoSyncClaude } from "./claude";
-import { shouldAutoSyncCline } from "./cline";
-import { shouldAutoSyncOpencode } from "./opencode";
 import {
   isRuleEnabled,
-  mirrorRuleToClaudeCode,
-  mirrorRuleToCline,
-  mirrorRuleToOpencode,
   setRuleEnabled,
   workspaceRulesDir,
 } from "./rulesOperations";
@@ -154,11 +148,17 @@ export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
  * Wires the tree view to checkbox events: a single click on a checkbox flips
  * the rule's `.mdc` ↔ `.mdc.disabled` rename. A workspace must be open—if not,
  * we surface a friendly hint instead of silently failing.
+ *
+ * `onRuleToggle` (optional) is invoked after every successful toggle with the
+ * rule file and its new state. It lets the caller propagate the change to
+ * mirrors (Cline / opencode / Claude Code, across every workspace folder)
+ * without this module knowing about them.
  */
 export function bindRulesTreeView(
   context: vscode.ExtensionContext,
   provider: RulesTreeProvider,
-  afterChange: () => Promise<void>
+  afterChange: () => Promise<void>,
+  onRuleToggle?: (ruleFile: string, enabled: boolean) => Promise<void>
 ): vscode.TreeView<Node> {
   const view = vscode.window.createTreeView<Node>(RULES_TREE_VIEW_ID, {
     treeDataProvider: provider,
@@ -182,33 +182,13 @@ export function bindRulesTreeView(
         vscode.window.showErrorMessage(`AI Rulebook: ${node.ruleFile} — ${msg}`);
         continue;
       }
-      if (shouldAutoSyncCline()) {
+      if (onRuleToggle) {
         try {
-          await mirrorRuleToCline(root, node.ruleFile, enable);
+          await onRuleToggle(node.ruleFile, enable);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           vscode.window.showErrorMessage(
-            `AI Rulebook: Cline mirror for ${node.ruleFile} — ${msg}`
-          );
-        }
-      }
-      if (await shouldAutoSyncOpencode(root)) {
-        try {
-          await mirrorRuleToOpencode(root, node.ruleFile, enable);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          vscode.window.showErrorMessage(
-            `AI Rulebook: opencode mirror for ${node.ruleFile} — ${msg}`
-          );
-        }
-      }
-      if (await shouldAutoSyncClaude(root)) {
-        try {
-          await mirrorRuleToClaudeCode(root, node.ruleFile, enable);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          vscode.window.showErrorMessage(
-            `AI Rulebook: Claude Code mirror for ${node.ruleFile} — ${msg}`
+            `AI Rulebook: mirror sync for ${node.ruleFile} — ${msg}`
           );
         }
       }

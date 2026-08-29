@@ -6,6 +6,34 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Status bar item.** Shows the enabled-rule count for the first workspace
+  folder plus the opencode config sync state, and clicks through to
+  **Sync rule pack to opencode**.
+- **Multi-root workspace support** for Cline, opencode, and Claude Code
+  mirroring: auto-sync and their manual sync commands now run independently
+  in every open workspace folder, judged on that folder's own evidence and
+  Cursor rule state. (The `.cursor/rules/ai-rules/` install itself stays
+  scoped to the first folder.)
+- **Explorer coloring for Cline mirrors.** `.clinerules/ai-rules/` files are
+  now tinted green / red alongside the Cursor, opencode, and Claude Code
+  mirrors.
+- **opencode `/ai-rulebook` command.** Syncing to opencode writes
+  `.opencode/command/ai-rulebook.md`, a slash command that lists active and
+  disabled rules. Removed alongside the rule mirror by the opencode and
+  all-formats remove commands.
+
+### Fixed
+
+- **Auto-sync now surfaces opencode config failures.** Previously only the
+  manual **Sync rule pack to opencode** command warned when the project's
+  opencode config couldn't be parsed; the same warning now appears when the
+  sync runs automatically on workspace open.
+- **`Install / update rule pack` under-synced multi-root workspaces.** The
+  command stopped mirroring to opencode/Claude Code after the first
+  matching folder instead of syncing every folder with evidence.
+
 ## [2.8.0] - 2026-08-29
 
 ### Added

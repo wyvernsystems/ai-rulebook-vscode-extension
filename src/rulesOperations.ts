@@ -398,6 +398,30 @@ export async function ensureOpencodeInstructionsEntry(
 }
 
 /**
+ * Read-only check: is `glob` already listed in the `instructions` array of
+ * the opencode config? Returns false when the config is missing or cannot be
+ * parsed safely. Never writes to the file.
+ */
+export async function opencodeConfigRegistersGlob(
+  configPath: string,
+  glob: string
+): Promise<boolean> {
+  let raw: string;
+  try {
+    raw = await fs.readFile(configPath, "utf8");
+  } catch {
+    return false;
+  }
+  try {
+    const parsed = JSON.parse(stripJsoncComments(raw)) as Record<string, unknown>;
+    return Array.isArray(parsed?.instructions) &&
+      (parsed.instructions as readonly unknown[]).includes(glob);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Copies each bundled rule into `.opencode/rules/ai-rules/` as a plain
  * `<topic>.md` file with the Cursor frontmatter stripped, and keeps the
  * generated folder out of source control. The mirror reflects the workspace's
