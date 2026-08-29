@@ -57,6 +57,20 @@ details belong in the code or in the rule files.
   `bundled/manifest.json` lists exactly the rules in `bundled/ai-rules/`, that
   every rule has a `description` in its frontmatter, and that no rule carries
   a placeholder the extension cannot render.
+- `npm run sync-bundled` regenerates both `bundled/manifest.json` and
+  `bundled/rule-packs/` (`cursor/`, `cline/`, `opencode/`, `claude-code/`),
+  each a ready-to-copy `ai-rules/` folder rendered from `bundled/ai-rules/`
+  using the same conversion rules as the corresponding workspace mirror
+  (`{{TEST_COMMAND}}` rendered as generic prose, since there is no project).
+  These folders are tracked in git — unlike the gitignored workspace
+  mirrors — so someone can browse or grab a tool's rules directly from the
+  repo without installing the extension. They are excluded from the VSIX
+  itself (`.vscodeignore`) since the extension only ever reads from
+  `bundled/ai-rules/`.
+- `npm run package-rule-packs` zips each `bundled/rule-packs/<tool>/` folder
+  into `ai-rulebook-rules-<tool>-X.Y.Z.zip` at the repository root, for
+  attaching to a GitHub release alongside the `.vsix` (see DEPLOY.md). The
+  zips are gitignored build artifacts, not tracked.
 - The bundled rules constrain task scope, code reuse and organization,
   dependency choices, input and error safety, testing integrity, triggered
   documentation updates, Markdown formatting, and unrequested Git mutations.
@@ -68,6 +82,14 @@ details belong in the code or in the rule files.
   `saoudrizwan.cline-nightly`) and `aiRules.autoSyncClineWhenInstalled` is
   on, the extension mirrors each topic rule into `.clinerules/ai-rules/` as
   `ai-rules-<topic>.md` after install, reset, manual sync, and first detection.
+- The Cline mirror reflects the workspace's Cursor rule state: enabled rules
+  are written as `ai-rules-<topic>.md`, disabled rules as
+  `ai-rules-<topic>.md.disabled` (Cline only reads `.md` files, so disabled
+  mirrors are skipped). Sidebar checkbox toggles and the enable /
+  disable-all commands update the mirror immediately when Cline is
+  installed and `aiRules.autoSyncClineWhenInstalled` is on. When the
+  workspace has no Cursor rules folder, every Cline rule defaults to
+  enabled.
 - opencode mirroring (`.opencode/rules/ai-rules/`) is independent of the
   Cursor install policy: when the workspace shows evidence of opencode usage
   (an `AGENTS.md`, an `opencode.json` / `opencode.jsonc`, or a `.opencode/`

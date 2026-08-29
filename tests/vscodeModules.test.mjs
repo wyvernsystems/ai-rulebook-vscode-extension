@@ -651,6 +651,52 @@ describe("bindRulesTreeView", () => {
       false
     );
   });
+
+  test("checkbox changes mirror the toggle to Cline when installed", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(root) }];
+    state.installedExtensions.add("saoudrizwan.claude-dev");
+    const rulesDir = rulesOperations.workspaceRulesDir(root);
+    await writeFile(
+      path.join(rulesDir, ruleNode.ruleFile),
+      "---\ndescription: x\nalwaysApply: true\n---\n\nBody\n"
+    );
+    await rulesOperations.mirrorRuleToCline(root, ruleNode.ruleFile, true);
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
+    const context = { subscriptions: [] };
+    const mirror = path.join(root, ".clinerules", "ai-rules", "ai-rules-code.md");
+
+    const view = sidebarTreeView.bindRulesTreeView(context, provider, async () => {});
+    await view.emitCheckboxState([[ruleNode, TreeItemCheckboxState.Unchecked]]);
+
+    assert.equal(await rulesOperations.isRuleEnabled(rulesDir, ruleNode.ruleFile), false);
+    assert.equal(await rulesOperations.pathExists(mirror), false);
+    assert.equal(
+      await rulesOperations.pathExists(`${mirror}.disabled`),
+      true
+    );
+  });
+
+  test("checkbox changes skip the Cline mirror when Cline is not installed", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(root) }];
+    const rulesDir = rulesOperations.workspaceRulesDir(root);
+    await writeFile(path.join(rulesDir, ruleNode.ruleFile));
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
+    const context = { subscriptions: [] };
+
+    const view = sidebarTreeView.bindRulesTreeView(context, provider, async () => {});
+    await view.emitCheckboxState([[ruleNode, TreeItemCheckboxState.Unchecked]]);
+
+    assert.equal(
+      await rulesOperations.pathExists(
+        path.join(root, ".clinerules", "ai-rules", "ai-rules-code.md.disabled")
+      ),
+      false
+    );
+  });
 });
 
 describe("rule status UI", () => {
@@ -800,6 +846,41 @@ describe("extension activation", () => {
     assert.equal(await rulesOperations.isRuleEnabled(rulesDir, SAMPLE_RULE), true);
   });
 
+  test("individual rule commands mirror the toggle to Cline, opencode, and Claude Code", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    state.installedExtensions.add("saoudrizwan.claude-dev");
+    await writeFile(path.join(workspaceRoot, "AGENTS.md"), "# rules\n");
+    await writeFile(path.join(workspaceRoot, "CLAUDE.md"), "# rules\n");
+    const rulesDir = rulesOperations.workspaceRulesDir(workspaceRoot);
+    await Promise.all(
+      RULE_FILES.map((ruleFile) => writeFile(path.join(rulesDir, ruleFile)))
+    );
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+    state.quickPickSelection = SAMPLE_RULE;
+
+    await state.registeredCommands.get("aiRules.disableRuleWorkspace")();
+
+    const clineMirror = path.join(workspaceRoot, ".clinerules", "ai-rules", "ai-rules-code.md");
+    const opencodeMirror = path.join(workspaceRoot, ".opencode", "rules", "ai-rules", "code.md");
+    const claudeMirror = path.join(workspaceRoot, ".claude", "rules", "ai-rules", "code.md");
+    assert.equal(await rulesOperations.pathExists(clineMirror), false);
+    assert.equal(await rulesOperations.pathExists(`${clineMirror}.disabled`), true);
+    assert.equal(await rulesOperations.pathExists(opencodeMirror), false);
+    assert.equal(await rulesOperations.pathExists(`${opencodeMirror}.disabled`), true);
+    assert.equal(await rulesOperations.pathExists(claudeMirror), false);
+    assert.equal(await rulesOperations.pathExists(`${claudeMirror}.disabled`), true);
+
+    await state.registeredCommands.get("aiRules.enableRuleWorkspace")();
+
+    assert.equal(await rulesOperations.pathExists(clineMirror), true);
+    assert.equal(await rulesOperations.pathExists(opencodeMirror), true);
+    assert.equal(await rulesOperations.pathExists(claudeMirror), true);
+  });
+
   test("bulk disable mirrors every rule off in the opencode folder", async (t) => {
     const workspaceRoot = await makeTempWorkspace();
     t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
@@ -844,6 +925,32 @@ describe("extension activation", () => {
     const dest = path.join(workspaceRoot, ".claude", "rules", "ai-rules");
     for (const ruleFile of RULE_FILES) {
       const mirrorName = ruleFile.replace(".mdc", ".md");
+      assert.equal(await rulesOperations.pathExists(path.join(dest, mirrorName)), false);
+      assert.equal(
+        await rulesOperations.pathExists(path.join(dest, `${mirrorName}.disabled`)),
+        true
+      );
+    }
+  });
+
+  test("bulk disable mirrors every rule off in the Cline folder", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    state.installedExtensions.add("saoudrizwan.claude-dev");
+    const rulesDir = rulesOperations.workspaceRulesDir(workspaceRoot);
+    await Promise.all(
+      RULE_FILES.map((ruleFile) => writeFile(path.join(rulesDir, ruleFile)))
+    );
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+
+    await state.registeredCommands.get("aiRules.disableCoreWorkspace")();
+
+    const dest = path.join(workspaceRoot, ".clinerules", "ai-rules");
+    for (const ruleFile of RULE_FILES) {
+      const mirrorName = `ai-rules-${ruleFile.replace(".mdc", ".md")}`;
       assert.equal(await rulesOperations.pathExists(path.join(dest, mirrorName)), false);
       assert.equal(
         await rulesOperations.pathExists(path.join(dest, `${mirrorName}.disabled`)),

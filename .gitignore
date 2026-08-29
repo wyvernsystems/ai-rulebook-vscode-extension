@@ -2,6 +2,7 @@
 node_modules/
 out/
 *.vsix
+ai-rulebook-rules-*.zip
 *.tsbuildinfo
 icon-source.png
 .github-release-notes-*.md

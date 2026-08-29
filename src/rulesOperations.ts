@@ -171,29 +171,98 @@ async function renderRuleTree(dir: string, testCommand: TestCommand): Promise<vo
   }
 }
 
+export function workspaceClineRulesDir(workspaceRoot: string): string {
+  return path.join(workspaceRoot, ".clinerules", RULES_SUBDIR);
+}
+
+/** `foo/bar.mdc` -> `ai-rules-foo-bar.md`, Cline's flat mirror naming. */
+function clineMirrorName(ruleFile: string): string {
+  return `ai-rules-${ruleFile.slice(0, -".mdc".length).replaceAll("/", "-")}.md`;
+}
+
+/**
+ * Mirrors each bundled rule into `.clinerules/ai-rules/` as
+ * `ai-rules-<topic>.md`, keeping the Cursor frontmatter as-is. The mirror
+ * reflects the workspace's Cursor rule state: enabled rules are written as
+ * `ai-rules-<topic>.md`, disabled ones as `ai-rules-<topic>.md.disabled`
+ * (Cline only reads `.md` files, so disabled mirrors are skipped). When the
+ * workspace has no Cursor rules folder yet, every rule defaults to enabled.
+ */
 export async function syncBundledMdcsToClinerules(
   workspaceRoot: string,
   bundleDir: string,
   ruleFiles: readonly string[],
   testCommand: TestCommand
 ): Promise<void> {
-  const dest = path.join(workspaceRoot, ".clinerules", RULES_SUBDIR);
+  const cursorDir = workspaceRulesDir(workspaceRoot);
+  const hasCursorRules = await pathExists(cursorDir);
+  const dest = workspaceClineRulesDir(workspaceRoot);
   const mirrors = await Promise.all(
     ruleFiles.map(async (ruleFile) => {
       const source = await bundledRulePath(bundleDir, ruleFile);
-      const mirrorName = `ai-rules-${ruleFile.slice(0, -".mdc".length).replaceAll("/", "-")}.md`;
+      const enabled = hasCursorRules ? await isRuleEnabled(cursorDir, ruleFile) : true;
       return {
-        source,
-        destination: safeJoinUnderBase(dest, mirrorName, "Cline rules directory"),
+        body: renderRuleBody(await fs.readFile(source, "utf8"), testCommand),
+        enabled,
+        destination: safeJoinUnderBase(dest, clineMirrorName(ruleFile), "Cline rules directory"),
       };
     })
   );
   await fs.mkdir(dest, { recursive: true });
-  for (const { source, destination } of mirrors) {
-    const body = renderRuleBody(await fs.readFile(source, "utf8"), testCommand);
-    await fs.writeFile(destination, body, "utf8");
+  for (const { body, enabled, destination } of mirrors) {
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await writeRuleMirror(destination, body, enabled);
   }
   await fs.rm(path.join(dest, "ai-rules-core.md"), { force: true });
+  await fs.rm(path.join(dest, "ai-rules-core.md.disabled"), { force: true });
+}
+
+/**
+ * Mirrors one rule into `.clinerules/ai-rules/` from the workspace's Cursor
+ * rule file (`<topic>.mdc` when enabled, `<topic>.mdc.disabled` when off),
+ * keeping the frontmatter as-is. Used to keep the Cline mirror in sync
+ * immediately after a sidebar toggle or a single-rule enable/disable.
+ */
+export async function mirrorRuleToCline(
+  workspaceRoot: string,
+  ruleFile: string,
+  enabled: boolean
+): Promise<void> {
+  const cursorActive = safeJoinUnderBase(
+    workspaceRulesDir(workspaceRoot),
+    ruleFile,
+    "rules directory"
+  );
+  const sourcePath = enabled ? cursorActive : `${cursorActive}.disabled`;
+  if (!(await pathExists(sourcePath))) {
+    return;
+  }
+  const body = await fs.readFile(sourcePath, "utf8");
+  const destination = safeJoinUnderBase(
+    workspaceClineRulesDir(workspaceRoot),
+    clineMirrorName(ruleFile),
+    "Cline rules directory"
+  );
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await writeRuleMirror(destination, body, enabled);
+}
+
+/**
+ * Rewrites the whole Cline mirror from the workspace's current Cursor rule
+ * state. No-op when the workspace has no Cursor rules folder. Used after
+ * bulk enable / disable commands.
+ */
+export async function syncClineMirrorFromWorkspace(
+  workspaceRoot: string,
+  ruleFiles: readonly string[]
+): Promise<void> {
+  const cursorDir = workspaceRulesDir(workspaceRoot);
+  if (!(await pathExists(cursorDir))) {
+    return;
+  }
+  for (const ruleFile of ruleFiles) {
+    await mirrorRuleToCline(workspaceRoot, ruleFile, await isRuleEnabled(cursorDir, ruleFile));
+  }
 }
 
 /**

@@ -246,7 +246,7 @@
     }
   },
   "scripts": {
-    "sync-bundled": "node scripts/sync-bundled.mjs",
+    "sync-bundled": "node scripts/sync-bundled.mjs && node scripts/build-rule-packs.mjs",
     "verify:bundled": "node scripts/verify-bundled.mjs",
     "clean": "node -e \"require('node:fs').rmSync('out', { recursive: true, force: true })\"",
     "compile": "npm run clean && tsc -p ./",
@@ -254,7 +254,8 @@
     "test": "npm run compile && npm run verify:bundled && node --test tests/*.test.mjs",
     "test:coverage": "npm run compile && npm run verify:bundled && node --test --experimental-test-coverage tests/*.test.mjs",
     "vscode:prepublish": "npm run sync-bundled && npm run verify:bundled && npm run compile",
-    "package": "vsce package"
+    "package": "vsce package",
+    "package-rule-packs": "node scripts/package-rule-packs.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

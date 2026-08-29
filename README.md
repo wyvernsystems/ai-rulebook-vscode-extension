@@ -15,8 +15,10 @@ testing, docs, Markdown, and Git. A sidebar lets you turn each rule on and off.
   code; add or update unit tests for behavior changes; run the lint and type
   checks the project already has; never weaken a test to make it pass; report
   every failing or unrun check.
-- **`docs.mdc`** — update `README.md`, `REQUIREMENTS.md`, `DEPLOY.md`, and
-  `CHANGELOG.md` only when their trigger applies.
+- **`docs.mdc`** — update `README.md`, `docs/REQUIREMENTS.md`,
+  `docs/DEPLOY.md`, and `CHANGELOG.md` only when their trigger applies.
+  Defaults to `README.md` and `CHANGELOG.md` at the repo root with everything
+  else in `docs/`, unless the project already has its own convention.
 - **`markdown.mdc`** — one H1, no skipped heading levels, `-` bullets,
   language-tagged code fences, inline code for paths and commands, relative
   links. Scoped to `**/*.{md,mdx}`, so it only loads while editing Markdown.
@@ -27,6 +29,17 @@ detects it from a `package.json` `test` script (using the lockfile to pick
 `npm`, `pnpm`, `yarn`, or `bun`), `Cargo.toml`, `go.mod`, pytest
 configuration, or a `test` target in a `Makefile`. When nothing is
 conclusive the rule says "the project's test command" instead of guessing.
+
+## Just want the rules?
+
+You don't need the extension to use these rules. [`bundled/rule-packs/`](./bundled/rule-packs)
+in this repo has a ready-to-copy folder per tool — `cursor/`, `cline/`,
+`opencode/`, `claude-code/` — already rendered in that tool's format. Every
+[GitHub release](https://github.com/wyvernsystems/ai-rulebook-vscode-extension/releases)
+also attaches them as standalone `ai-rulebook-rules-<tool>-X.Y.Z.zip` files,
+so you can grab just the one you need without cloning the repo. Drop the
+`ai-rules/` folder it contains into the location named in that tool's section
+below.
 
 ## VS Code
 
@@ -64,6 +77,10 @@ Install the same VSIX in Cursor — it is a VS Code-compatible host.
    sidebar.
 3. Rule files in the file tree are green when enabled, red when disabled.
 
+**Without the extension**: grab [`bundled/rule-packs/cursor/`](./bundled/rule-packs/cursor)
+(or its release zip) and copy its `ai-rules/` folder to
+`.cursor/rules/ai-rules/`.
+
 ## opencode
 
 **Set up the rules**
@@ -95,8 +112,9 @@ After setup, toggling rules in the **AI Rulebook** sidebar keeps the mirror in
 sync: enabled rules stay as `<topic>.md`, disabled rules become
 `<topic>.md.disabled` and are skipped.
 
-**Without the extension**: copy the rule files into
-`.opencode/rules/ai-rules/` yourself and add
+**Without the extension**: grab [`bundled/rule-packs/opencode/`](./bundled/rule-packs/opencode)
+(or its release zip) and copy its `ai-rules/` folder to
+`.opencode/rules/ai-rules/`, then add
 `"instructions": [".opencode/rules/ai-rules/*.md"]` to your `opencode.json`.
 
 ## Claude Code
@@ -129,9 +147,9 @@ After setup, toggling rules in the **AI Rulebook** sidebar keeps the mirror in
 sync: enabled rules stay as `<topic>.md`, disabled rules become
 `<topic>.md.disabled` and are skipped.
 
-**Without the extension**: copy the rule files into `.claude/rules/ai-rules/`
-yourself, stripping the Cursor frontmatter (and converting any `globs:` line
-to a `paths:` list) — no config file changes needed.
+**Without the extension**: grab [`bundled/rule-packs/claude-code/`](./bundled/rule-packs/claude-code)
+(or its release zip) and copy its `ai-rules/` folder to
+`.claude/rules/ai-rules/` — no config file changes needed.
 
 ## Notes
 
@@ -140,7 +158,12 @@ to a `paths:` list) — no config file changes needed.
   `.claude/rules/ai-rules/`) are left unignored so they can be committed and
   shared with the team.
 - With Cline installed, the rules are mirrored to `.clinerules/ai-rules/`
-  automatically.
+  automatically. Toggling rules in the **AI Rulebook** sidebar keeps that
+  mirror in sync too: enabled rules stay as `ai-rules-<topic>.md`, disabled
+  rules become `ai-rules-<topic>.md.disabled` and are skipped. Without the
+  extension, grab [`bundled/rule-packs/cline/`](./bundled/rule-packs/cline)
+  (or its release zip) and copy its `ai-rules/` folder to
+  `.clinerules/ai-rules/`.
 - Disable automatic installation with
   `aiRules.autoInstallOnOpenWorkspace: false`.
 - Rule files installed under `.cursor/rules/ai-rules/` are editable; the
@@ -155,8 +178,9 @@ npm run package
 ```
 
 Rule text is edited in `bundled/ai-rules/`, the tracked source of truth that
-ships in the VSIX. Run `npm run sync-bundled` after adding or removing a rule
-file to regenerate `bundled/manifest.json`.
+ships in the VSIX. Run `npm run sync-bundled` after adding, removing, or
+editing a rule file to regenerate `bundled/manifest.json` and the per-tool
+folders under `bundled/rule-packs/` — commit both alongside the rule change.
 
 Source rules hold the `{{TEST_COMMAND}}` token verbatim; the extension
 substitutes the project's real command on the way into a workspace. The
@@ -164,7 +188,8 @@ substitutes the project's real command on the way into a workspace. The
 gitignored, absent on a fresh clone, and must not be edited as if it were the
 source.
 
-Cutting a release is documented in [DEPLOY.md](./DEPLOY.md).
+Requirements are tracked in [docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md).
+Cutting a release is documented in [docs/DEPLOY.md](./docs/DEPLOY.md).
 
 ## License
 

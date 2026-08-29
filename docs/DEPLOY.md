@@ -8,6 +8,8 @@ version bump, a tag, and an uploaded artifact. This document is the checklist.
 
 - Node.js 18.18 or newer (the value in `engines.node`). Use the same major
   version you develop against.
+- The `zip` CLI (preinstalled on macOS and most Linux distributions) — used to
+  package the rule-pack release assets.
 - A clean working tree on `main`, up to date with `origin/main`.
 - [GitHub CLI](https://cli.github.com/) authenticated against the
   `wyvernsystems` account with `repo` scope: `gh auth status`.
@@ -61,6 +63,13 @@ Rule text is edited in `bundled/ai-rules/`. The `.cursor/rules/ai-rules/`
 folder is a generated install, gitignored and absent on a fresh clone, so
 nothing in the release path reads from it.
 
+`npm run sync-bundled` also regenerates `bundled/rule-packs/` — one
+ready-to-copy folder per host (`cursor/`, `cline/`, `opencode/`,
+`claude-code/`), rendered from `bundled/ai-rules/` the same way the extension
+mirrors rules into a workspace. These folders are tracked in git so anyone
+can browse or grab them without installing the extension; commit them
+whenever a rule change leaves them stale.
+
 ### 2. Bump the version
 
 ```bash
@@ -90,6 +99,7 @@ someone deciding whether to upgrade, not as a commit log.
 ```bash
 npm run test:coverage
 npm run package
+npm run package-rule-packs
 ```
 
 Record the test count and coverage percentages from `test:coverage` — the
@@ -100,6 +110,11 @@ you did not do is exactly what `tests.mdc` forbids.
 `vscode:prepublish` (`sync-bundled`, `verify:bundled`, `compile`). Confirm it
 emits `ai-rulebook-X.Y.Z.vsix` at the repository root. The `.vsix` is
 gitignored and is never committed; it exists only as a release asset.
+
+`npm run package-rule-packs` zips each folder under `bundled/rule-packs/`
+into `ai-rulebook-rules-<tool>-X.Y.Z.zip` at the repository root — one per
+host, for people who just want the rules. Like the `.vsix`, these zips are
+gitignored and exist only as release assets.
 
 ### 5. Commit and tag
 
@@ -117,7 +132,12 @@ exists on the remote.
 ### 6. Publish the GitHub release
 
 ```bash
-gh release create vX.Y.Z ai-rulebook-X.Y.Z.vsix \
+gh release create vX.Y.Z \
+  ai-rulebook-X.Y.Z.vsix \
+  ai-rulebook-rules-cursor-X.Y.Z.zip \
+  ai-rulebook-rules-cline-X.Y.Z.zip \
+  ai-rulebook-rules-opencode-X.Y.Z.zip \
+  ai-rulebook-rules-claude-code-X.Y.Z.zip \
   --title "AI Rulebook X.Y.Z" \
   --notes-file <notes.md>
 ```
@@ -127,6 +147,9 @@ Conventions carried forward from earlier releases:
 - Title is `AI Rulebook X.Y.Z` — no `v` prefix in the title, `v` prefix on the
   tag.
 - The `.vsix` is attached as an asset, because that is how users install.
+- The four `ai-rulebook-rules-<tool>-X.Y.Z.zip` files are attached alongside
+  it, for anyone who wants just the rules for one tool without installing the
+  extension.
 - Notes lead with a short paragraph on why the release matters, then
   `## Highlights`, then an `## Upgrading` section whenever installed
   workspaces need an action.
@@ -170,8 +193,10 @@ its notes and publishing the fix.
 
 `.vscodeignore` excludes everything except the runtime payload:
 
-- `bundled/` — the rule pack and its manifest, the only reason the extension
-  exists.
+- `bundled/ai-rules/` and `bundled/manifest.json` — the rule pack the
+  extension actually reads from at runtime. `bundled/rule-packs/` is excluded
+  from the VSIX: it exists for the standalone zip assets in step 6, not for
+  the extension itself.
 - `out/` — compiled JavaScript. Sources, tests, scripts, and maps are excluded.
 - `icon.png`, `LICENSE`, `README.md`, `CHANGELOG.md`, `package.json`.
 

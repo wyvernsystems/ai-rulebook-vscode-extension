@@ -1,7 +1,3 @@
----
-description: Documentation update triggers
-alwaysApply: true
----
 
 # Docs
 

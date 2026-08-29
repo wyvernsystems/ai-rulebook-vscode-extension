@@ -17,10 +17,11 @@ tsconfig.json
 package-lock.json
 *.vsix
 icon-source.png
-REQUIREMENTS.md
-DEPLOY.md
+docs/**
 .github-release-notes-*.md
-!bundled/**
+bundled/rule-packs/**
+!bundled/ai-rules/**
+!bundled/manifest.json
 !out/**
 !icon.png
 !LICENSE

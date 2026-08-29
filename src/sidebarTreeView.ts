@@ -1,9 +1,11 @@
 import * as vscode from "vscode";
 import { shouldAutoSyncClaude } from "./claude";
+import { shouldAutoSyncCline } from "./cline";
 import { shouldAutoSyncOpencode } from "./opencode";
 import {
   isRuleEnabled,
   mirrorRuleToClaudeCode,
+  mirrorRuleToCline,
   mirrorRuleToOpencode,
   setRuleEnabled,
   workspaceRulesDir,
@@ -179,6 +181,16 @@ export function bindRulesTreeView(
         const msg = err instanceof Error ? err.message : String(err);
         vscode.window.showErrorMessage(`AI Rulebook: ${node.ruleFile} — ${msg}`);
         continue;
+      }
+      if (shouldAutoSyncCline()) {
+        try {
+          await mirrorRuleToCline(root, node.ruleFile, enable);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          vscode.window.showErrorMessage(
+            `AI Rulebook: Cline mirror for ${node.ruleFile} — ${msg}`
+          );
+        }
       }
       if (await shouldAutoSyncOpencode(root)) {
         try {

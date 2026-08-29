@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { shouldAutoSyncClaude, syncRulePackToClaude } from "./claude";
-import { isClineInstalled } from "./cline";
+import { isClineInstalled, shouldAutoSyncCline } from "./cline";
 import {
   isCursorHost,
   readCursorInstallPolicy,
@@ -15,12 +15,16 @@ import {
 } from "./ruleStatusUi";
 import {
   installRulePack,
+  mirrorRuleToClaudeCode,
+  mirrorRuleToCline,
+  mirrorRuleToOpencode,
   OPENCODE_RULES_GLOB,
   pathExists,
   resetRulesDirToBundle,
   setRuleEnabled,
   syncBundledMdcsToClinerules,
   syncClaudeMirrorFromWorkspace,
+  syncClineMirrorFromWorkspace,
   syncOpencodeMirrorFromWorkspace,
   workspaceRulesDir,
 } from "./rulesOperations";
@@ -105,10 +109,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   /** Returns true if Cline mirror was written. */
   const maybeAutoSyncCline = async (root: string): Promise<boolean> => {
-    if (!getAiRulesBoolean("autoSyncClineWhenInstalled", true)) {
-      return false;
-    }
-    if (!isClineInstalled()) {
+    if (!shouldAutoSyncCline()) {
       return false;
     }
     await syncBundledMdcsToClinerules(root, bundleDir, mdcs, await detectTestCommand(root));
@@ -137,7 +138,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.extensions.onDidChange(() => {
       const now = isClineInstalled();
-      if (now && !clineWasInstalled && getAiRulesBoolean("autoSyncClineWhenInstalled", true)) {
+      if (!clineWasInstalled && shouldAutoSyncCline()) {
         const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (root) {
           void detectTestCommand(root)
@@ -226,8 +227,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     const writeCursorRules = shouldAutoInstallCursorRules();
-    const wantCline =
-      getAiRulesBoolean("autoSyncClineWhenInstalled", true) && isClineInstalled();
+    const wantCline = shouldAutoSyncCline();
     const wantOpencode = await shouldAutoSyncOpencode(root);
     const wantClaude = await shouldAutoSyncClaude(root);
     const testCommand = await detectTestCommand(root);
@@ -309,7 +309,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const testCommand = await detectTestCommand(root);
     await installRulePack(bundleDir, rulesDir, mdcs, testCommand);
     const parts = ["AI Rulebook: installed the rule pack into `.cursor/rules/ai-rules/`."];
-    if (getAiRulesBoolean("autoSyncClineWhenInstalled", true) && isClineInstalled()) {
+    if (shouldAutoSyncCline()) {
       await syncBundledMdcsToClinerules(root, bundleDir, mdcs, testCommand);
       parts.push("Cline: synced to `.clinerules/ai-rules/`.");
     }
@@ -337,6 +337,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     const rulesDir = workspaceRulesDir(root);
     await setRuleEnabled(rulesDir, ruleFile, enabled);
+    if (shouldAutoSyncCline()) {
+      await mirrorRuleToCline(root, ruleFile, enabled);
+    }
+    if (await shouldAutoSyncOpencode(root)) {
+      await mirrorRuleToOpencode(root, ruleFile, enabled);
+    }
+    if (await shouldAutoSyncClaude(root)) {
+      await mirrorRuleToClaudeCode(root, ruleFile, enabled);
+    }
     vscode.window.showInformationMessage(
       `AI Rulebook: ${ruleFile} ${enabled ? "enabled" : "disabled"} in this workspace.`
     );
@@ -351,6 +360,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const root = ensureWorkspace();
     const rulesDir = workspaceRulesDir(root);
     await Promise.all(mdcs.map((ruleFile) => setRuleEnabled(rulesDir, ruleFile, true)));
+    if (shouldAutoSyncCline()) {
+      await syncClineMirrorFromWorkspace(root, mdcs);
+    }
     if (await shouldAutoSyncOpencode(root)) {
       await syncOpencodeMirrorFromWorkspace(root, mdcs);
     }
@@ -366,6 +378,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const root = ensureWorkspace();
     const rulesDir = workspaceRulesDir(root);
     await Promise.all(mdcs.map((ruleFile) => setRuleEnabled(rulesDir, ruleFile, false)));
+    if (shouldAutoSyncCline()) {
+      await syncClineMirrorFromWorkspace(root, mdcs);
+    }
     if (await shouldAutoSyncOpencode(root)) {
       await syncOpencodeMirrorFromWorkspace(root, mdcs);
     }
