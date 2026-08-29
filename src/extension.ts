@@ -20,6 +20,11 @@ import {
   mirrorRuleToOpencode,
   OPENCODE_RULES_GLOB,
   pathExists,
+  removeAllRuleFormats,
+  removeClaudeRules,
+  removeClineRules,
+  removeCursorRules,
+  removeOpencodeRules,
   resetRulesDirToBundle,
   setRuleEnabled,
   syncBundledMdcsToClinerules,
@@ -449,6 +454,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
   });
 
+  register("aiRules.syncCursorWorkspace", async () => {
+    const root = ensureWorkspace();
+    if (!(await pathExists(bundleDir))) {
+      throw new Error(`Missing bundle at ${bundleDir}`);
+    }
+    const rulesDir = workspaceRulesDir(root);
+    const testCommand = await detectTestCommand(root);
+    await installRulePack(bundleDir, rulesDir, mdcs, testCommand);
+    vscode.window.showInformationMessage(
+      "AI Rulebook: wrote the rule pack to `.cursor/rules/ai-rules/`."
+    );
+    await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
+    treeProvider.refresh();
+  });
+
   register("aiRules.syncClineWorkspace", async () => {
     const root = ensureWorkspace();
     await syncBundledMdcsToClinerules(root, bundleDir, mdcs, await detectTestCommand(root));
@@ -490,6 +510,130 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.showInformationMessage(
       "AI Rulebook: wrote the rule pack to `.claude/rules/ai-rules/`."
     );
+  });
+
+  register("aiRules.syncAllFormatsWorkspace", async () => {
+    const root = ensureWorkspace();
+    if (!(await pathExists(bundleDir))) {
+      throw new Error(`Missing bundle at ${bundleDir}`);
+    }
+    const rulesDir = workspaceRulesDir(root);
+    const testCommand = await detectTestCommand(root);
+    await installRulePack(bundleDir, rulesDir, mdcs, testCommand);
+    await syncBundledMdcsToClinerules(root, bundleDir, mdcs, testCommand);
+    const opencodeResult = await syncRulePackToOpencode(root, bundleDir, mdcs, testCommand);
+    await syncRulePackToClaude(root, bundleDir, mdcs, testCommand);
+
+    const parts = [
+      "AI Rulebook: synced the rule pack to `.cursor/rules/ai-rules/`, `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`, and `.claude/rules/ai-rules/`.",
+    ];
+    if (opencodeResult === "skipped") {
+      vscode.window.showWarningMessage(
+        'AI Rulebook: wrote the opencode rule files but could not update the opencode config ' +
+          "(unrecognized format). Add " +
+          `"instructions": ["${OPENCODE_RULES_GLOB}"] to your opencode config manually.`
+      );
+    } else {
+      vscode.window.showInformationMessage(parts.join(" "));
+    }
+    await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
+    treeProvider.refresh();
+  });
+
+  const confirmDestructive = async (message: string, action: string): Promise<boolean> => {
+    const choice = await vscode.window.showWarningMessage(message, { modal: true }, action, "Cancel");
+    return choice === action;
+  };
+
+  const formatRemovalMessage = (removed: boolean, label: string): string =>
+    removed ? `${label}: removed.` : `${label}: nothing to remove.`;
+
+  register("aiRules.removeCursorWorkspace", async () => {
+    const root = ensureWorkspace();
+    const confirmed = await confirmDestructive(
+      "Remove the Cursor rule pack from `.cursor/rules/ai-rules/`?\n\n" +
+        "Unsaved or uncommitted edits in that folder may be lost.",
+      "Remove Cursor rules"
+    );
+    if (!confirmed) {
+      return;
+    }
+    const removed = await removeCursorRules(root);
+    vscode.window.showInformationMessage(
+      `AI Rulebook: ${formatRemovalMessage(removed, "Cursor")}`
+    );
+    treeProvider.refresh();
+  });
+
+  register("aiRules.removeClineWorkspace", async () => {
+    const root = ensureWorkspace();
+    const confirmed = await confirmDestructive(
+      "Remove the Cline rule pack from `.clinerules/ai-rules/`?",
+      "Remove Cline rules"
+    );
+    if (!confirmed) {
+      return;
+    }
+    const removed = await removeClineRules(root);
+    vscode.window.showInformationMessage(
+      `AI Rulebook: ${formatRemovalMessage(removed, "Cline")}`
+    );
+  });
+
+  register("aiRules.removeOpencodeWorkspace", async () => {
+    const root = ensureWorkspace();
+    const confirmed = await confirmDestructive(
+      "Remove the opencode rule pack from `.opencode/rules/ai-rules/`?\n\n" +
+        "The opencode config `instructions` entry is not edited automatically.",
+      "Remove opencode rules"
+    );
+    if (!confirmed) {
+      return;
+    }
+    const removed = await removeOpencodeRules(root);
+    vscode.window.showInformationMessage(
+      `AI Rulebook: ${formatRemovalMessage(removed, "opencode")}`
+    );
+  });
+
+  register("aiRules.removeClaudeWorkspace", async () => {
+    const root = ensureWorkspace();
+    const confirmed = await confirmDestructive(
+      "Remove the Claude Code rule pack from `.claude/rules/ai-rules/`?",
+      "Remove Claude Code rules"
+    );
+    if (!confirmed) {
+      return;
+    }
+    const removed = await removeClaudeRules(root);
+    vscode.window.showInformationMessage(
+      `AI Rulebook: ${formatRemovalMessage(removed, "Claude Code")}`
+    );
+  });
+
+  register("aiRules.removeAllFormatsWorkspace", async () => {
+    const root = ensureWorkspace();
+    const confirmed = await confirmDestructive(
+      "Remove every AI Rulebook rule pack from this workspace?\n\n" +
+        "• `.cursor/rules/ai-rules/`\n" +
+        "• `.clinerules/ai-rules/`\n" +
+        "• `.opencode/rules/ai-rules/`\n" +
+        "• `.claude/rules/ai-rules/`\n\n" +
+        "Unsaved or uncommitted edits may be lost.",
+      "Remove all rule packs"
+    );
+    if (!confirmed) {
+      return;
+    }
+    const result = await removeAllRuleFormats(root);
+    const parts = [
+      formatRemovalMessage(result.cursor, "Cursor"),
+      formatRemovalMessage(result.cline, "Cline"),
+      formatRemovalMessage(result.opencode, "opencode"),
+      formatRemovalMessage(result.claude, "Claude Code"),
+    ];
+    vscode.window.showInformationMessage(`AI Rulebook: ${parts.join(" ")}`);
+    treeProvider.refresh();
   });
 
   register("aiRules.refreshTree", async () => {

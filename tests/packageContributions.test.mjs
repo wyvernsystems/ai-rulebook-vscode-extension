@@ -35,6 +35,38 @@ describe("VS Code package contributions", () => {
     }
   });
 
+  test("contributes manual sync and remove commands for every supported format", () => {
+    const commandIds = new Set(
+      contributions.commands.map((command) => command.command)
+    );
+
+    for (const command of [
+      "aiRules.syncCursorWorkspace",
+      "aiRules.syncClineWorkspace",
+      "aiRules.syncOpencodeWorkspace",
+      "aiRules.syncClaudeWorkspace",
+      "aiRules.syncAllFormatsWorkspace",
+      "aiRules.removeCursorWorkspace",
+      "aiRules.removeClineWorkspace",
+      "aiRules.removeOpencodeWorkspace",
+      "aiRules.removeClaudeWorkspace",
+      "aiRules.removeAllFormatsWorkspace",
+    ]) {
+      assert.ok(commandIds.has(command), `missing format command: ${command}`);
+    }
+  });
+
+  test("sync and remove sidebar menus are not gated by host application", () => {
+    const syncMenu = contributions.menus["aiRules.syncSubmenu"] ?? [];
+    const removeMenu = contributions.menus["aiRules.removeSubmenu"] ?? [];
+    const toolbarSubmenus = contributions.menus["view/title"].filter((item) => item.submenu);
+
+    for (const item of [...syncMenu, ...removeMenu, ...toolbarSubmenus]) {
+      const when = item.when ?? "";
+      assert.ok(!/cursor|vscode|isCursor|isVscode/i.test(when), `unexpected host gate: ${JSON.stringify(item)}`);
+    }
+  });
+
   test("does not contribute obsolete multi-rule commands", () => {
     const commandIds = contributions.commands.map((command) => command.command);
     const removedCommands = [
@@ -54,7 +86,8 @@ describe("VS Code package contributions", () => {
     const commandIds = new Set(contributions.commands.map((command) => command.command));
     const menuCommands = Object.values(contributions.menus)
       .flat()
-      .map((item) => item.command);
+      .map((item) => item.command)
+      .filter(Boolean);
 
     for (const command of menuCommands) {
       assert.ok(commandIds.has(command), `menu references missing command: ${command}`);

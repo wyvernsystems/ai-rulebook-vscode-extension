@@ -21,6 +21,16 @@ const LEGACY_CORE_RULE_FILE = "core.mdc";
 export const OPENCODE_RULES_GLOB = ".opencode/rules/ai-rules/*.md";
 
 const RULES_DIR_SEGMENTS = [".cursor", "rules", RULES_SUBDIR] as const;
+const CLINE_RULES_DIR_SEGMENTS = [".clinerules", RULES_SUBDIR] as const;
+const OPENCODE_RULES_DIR_SEGMENTS = [".opencode", "rules", RULES_SUBDIR] as const;
+const CLAUDE_RULES_DIR_SEGMENTS = [".claude", "rules", RULES_SUBDIR] as const;
+
+export type RuleFormatRemovalResult = {
+  cursor: boolean;
+  cline: boolean;
+  opencode: boolean;
+  claude: boolean;
+};
 
 export function workspaceRulesDir(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".cursor", "rules", RULES_SUBDIR);
@@ -665,6 +675,67 @@ export async function syncClaudeMirrorFromWorkspace(
   for (const ruleFile of ruleFiles) {
     await mirrorRuleToClaudeCode(workspaceRoot, ruleFile, await isRuleEnabled(cursorDir, ruleFile));
   }
+}
+
+async function removeRulesDirIfPresent(
+  target: string,
+  expectedSegments: readonly string[],
+  label: string
+): Promise<boolean> {
+  if (!(await pathExists(target))) {
+    return false;
+  }
+  assertSafeDeletionTarget(target, expectedSegments, label);
+  await fs.rm(target, { recursive: true, force: true });
+  return true;
+}
+
+/** Deletes `.cursor/rules/ai-rules/` when present. Returns whether anything was removed. */
+export async function removeCursorRules(workspaceRoot: string): Promise<boolean> {
+  return removeRulesDirIfPresent(
+    workspaceRulesDir(workspaceRoot),
+    RULES_DIR_SEGMENTS,
+    "Cursor rules folder"
+  );
+}
+
+/** Deletes `.clinerules/ai-rules/` when present. Returns whether anything was removed. */
+export async function removeClineRules(workspaceRoot: string): Promise<boolean> {
+  return removeRulesDirIfPresent(
+    workspaceClineRulesDir(workspaceRoot),
+    CLINE_RULES_DIR_SEGMENTS,
+    "Cline rules folder"
+  );
+}
+
+/** Deletes `.opencode/rules/ai-rules/` when present. Returns whether anything was removed. */
+export async function removeOpencodeRules(workspaceRoot: string): Promise<boolean> {
+  return removeRulesDirIfPresent(
+    workspaceOpencodeRulesDir(workspaceRoot),
+    OPENCODE_RULES_DIR_SEGMENTS,
+    "opencode rules folder"
+  );
+}
+
+/** Deletes `.claude/rules/ai-rules/` when present. Returns whether anything was removed. */
+export async function removeClaudeRules(workspaceRoot: string): Promise<boolean> {
+  return removeRulesDirIfPresent(
+    workspaceClaudeRulesDir(workspaceRoot),
+    CLAUDE_RULES_DIR_SEGMENTS,
+    "Claude Code rules folder"
+  );
+}
+
+/** Deletes every supported rule-pack folder that exists in the workspace. */
+export async function removeAllRuleFormats(
+  workspaceRoot: string
+): Promise<RuleFormatRemovalResult> {
+  return {
+    cursor: await removeCursorRules(workspaceRoot),
+    cline: await removeClineRules(workspaceRoot),
+    opencode: await removeOpencodeRules(workspaceRoot),
+    claude: await removeClaudeRules(workspaceRoot),
+  };
 }
 
 type JsoncToken = {

@@ -13,6 +13,11 @@ import {
   mirrorRuleToOpencode,
   OPENCODE_RULES_GLOB,
   pathExists,
+  removeAllRuleFormats,
+  removeClaudeRules,
+  removeClineRules,
+  removeCursorRules,
+  removeOpencodeRules,
   resetRulesDirToBundle,
   resolveOpencodeConfigPath,
   setRuleEnabled,
@@ -910,5 +915,67 @@ describe("workspaceClaudeRulesDir", () => {
   test("uses the expected suffix", () => {
     const dir = workspaceClaudeRulesDir("/tmp/proj");
     assert.ok(dir.endsWith(path.join(".claude", "rules", "ai-rules")));
+  });
+});
+
+describe("remove rule format folders", () => {
+  test("removeCursorRules deletes only the Cursor rules folder", async () => {
+    const workspace = await makeTempRoot("airules-remove-cursor-");
+    try {
+      await writeFile(path.join(workspaceRulesDir(workspace), SAMPLE_RULE), "on\n");
+      await writeFile(path.join(workspace, ".clinerules", "ai-rules", "ai-rules-code.md"), "cline\n");
+
+      assert.equal(await removeCursorRules(workspace), true);
+      assert.equal(await pathExists(workspaceRulesDir(workspace)), false);
+      assert.equal(
+        await pathExists(path.join(workspace, ".clinerules", "ai-rules", "ai-rules-code.md")),
+        true
+      );
+      assert.equal(await removeCursorRules(workspace), false);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("removeAllRuleFormats deletes every supported folder that exists", async () => {
+    const workspace = await makeTempRoot("airules-remove-all-");
+    try {
+      await writeFile(path.join(workspaceRulesDir(workspace), SAMPLE_RULE), "cursor\n");
+      await writeFile(path.join(workspace, ".clinerules", "ai-rules", "ai-rules-code.md"), "cline\n");
+      await writeFile(path.join(workspace, ".opencode", "rules", "ai-rules", "code.md"), "open\n");
+      await writeFile(path.join(workspace, ".claude", "rules", "ai-rules", "code.md"), "claude\n");
+
+      const result = await removeAllRuleFormats(workspace);
+      assert.deepEqual(result, {
+        cursor: true,
+        cline: true,
+        opencode: true,
+        claude: true,
+      });
+      assert.equal(await pathExists(workspaceRulesDir(workspace)), false);
+      assert.equal(await pathExists(path.join(workspace, ".clinerules", "ai-rules")), false);
+      assert.equal(await pathExists(path.join(workspace, ".opencode", "rules", "ai-rules")), false);
+      assert.equal(await pathExists(path.join(workspace, ".claude", "rules", "ai-rules")), false);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("individual remove helpers no-op when the folder is absent", async () => {
+    const workspace = await makeTempRoot("airules-remove-missing-");
+    try {
+      assert.equal(await removeCursorRules(workspace), false);
+      assert.equal(await removeClineRules(workspace), false);
+      assert.equal(await removeOpencodeRules(workspace), false);
+      assert.equal(await removeClaudeRules(workspace), false);
+      assert.deepEqual(await removeAllRuleFormats(workspace), {
+        cursor: false,
+        cline: false,
+        opencode: false,
+        claude: false,
+      });
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
   });
 });

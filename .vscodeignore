@@ -1,4 +1,7 @@
 .cursor/**
+.claude/**
+.clinerules/**
+.opencode/**
 .git/**
 .github/**
 .vscode/**
@@ -16,6 +19,7 @@ node_modules/**
 tsconfig.json
 package-lock.json
 *.vsix
+ai-rulebook-rules-*.zip
 icon-source.png
 docs/**
 .github-release-notes-*.md

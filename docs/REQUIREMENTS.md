@@ -121,6 +121,19 @@ details belong in the code or in the rule files.
   config file is registered or edited.
 - The `AI Rulebook: Sync rule pack to Claude Code` command runs the Claude
   Code mirror manually, regardless of the auto-sync gate.
+- The `AI Rulebook: Sync rule pack to Cursor` command refreshes
+  `.cursor/rules/ai-rules/` from the bundled copy manually, regardless of
+  host application or `aiRules.installCursorRulesFolder`.
+- The `AI Rulebook: Sync rule pack to all formats` command writes every
+  supported mirror (Cursor, Cline, opencode, and Claude Code) in one step,
+  ignoring every auto-sync gate.
+- Remove commands delete `.cursor/rules/ai-rules/`, `.clinerules/ai-rules/`,
+  `.opencode/rules/ai-rules/`, or `.claude/rules/ai-rules/` individually, or
+  all four at once after a confirmation dialog. Removing opencode rules does
+  not edit the opencode config `instructions` array.
+- Manual sync and remove commands are exposed in the Rule Pack sidebar under
+  **Sync rule packs** and **Remove rule packs** submenus. None are hidden
+  based on whether the host is Cursor or plain VS Code.
 - The Claude Code mirror reflects the workspace's Cursor rule state: enabled
   rules are written as `<topic>.md`, disabled rules as `<topic>.md.disabled`
   (Claude Code only auto-loads `.md` files, so disabled mirrors are skipped).
@@ -156,7 +169,9 @@ details belong in the code or in the rule files.
   manifest entry under a base directory. Out-of-tree paths must throw before
   any filesystem call.
 - **Destructive operations** require the workspace rules folder to end with
-  `.cursor/rules/ai-rules`.
+  `.cursor/rules/ai-rules`. Remove commands for other formats require paths
+  ending with `.clinerules/ai-rules`, `.opencode/rules/ai-rules`, or
+  `.claude/rules/ai-rules` respectively.
 - **Recursive copies refuse symlinks.** `fs.cp` calls and the on-disk walker
   must skip symbolic links.
 - **VSIX contents** are limited to compiled JS (`out/**`), the bundled rule

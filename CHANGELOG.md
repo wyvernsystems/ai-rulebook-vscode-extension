@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-08-29
+
+### Added
+
+- **Manual sync and remove commands for every supported format.** New
+  command-palette and sidebar submenu actions sync or delete the Cursor
+  (`.cursor/rules/ai-rules/`), Cline (`.clinerules/ai-rules/`), opencode
+  (`.opencode/rules/ai-rules/`), and Claude Code (`.claude/rules/ai-rules/`)
+  rule packs individually, plus **Sync rule pack to all formats** and
+  **Remove all rule packs**. Manual sync commands ignore host detection and
+  auto-sync gates so they stay available in both Cursor and plain VS Code.
+- **Sidebar Sync / Remove submenus** on the Rule Pack view expose the manual
+  format commands without hiding any target based on the host application.
+
+### Fixed
+
+- **VSIX packaging.** `.vscodeignore` now excludes local mirror folders
+  (`.claude/`, `.clinerules/`, `.opencode/`) and rule-pack zip build
+  artifacts so they cannot leak into the extension package.
+
 ## [2.7.0] - 2026-08-29
 
 ### Added

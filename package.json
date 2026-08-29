@@ -2,7 +2,7 @@
   "name": "ai-rulebook",
   "displayName": "AI Rulebook",
   "description": "AI Rulebook — install and manage focused, always-on engineering rules for Cursor, with optional Cline, opencode, and Claude Code sync.",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "publisher": "WyvernSystemsLLC",
   "license": "MIT",
   "icon": "icon.png",
@@ -73,6 +73,11 @@
         "category": "AI Rulebook"
       },
       {
+        "command": "aiRules.syncCursorWorkspace",
+        "title": "AI Rulebook: Sync rule pack to Cursor",
+        "category": "AI Rulebook"
+      },
+      {
         "command": "aiRules.syncOpencodeWorkspace",
         "title": "AI Rulebook: Sync rule pack to opencode",
         "category": "AI Rulebook"
@@ -80,6 +85,36 @@
       {
         "command": "aiRules.syncClaudeWorkspace",
         "title": "AI Rulebook: Sync rule pack to Claude Code",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.syncAllFormatsWorkspace",
+        "title": "AI Rulebook: Sync rule pack to all formats",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.removeCursorWorkspace",
+        "title": "AI Rulebook: Remove Cursor rule pack",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.removeClineWorkspace",
+        "title": "AI Rulebook: Remove Cline rule pack",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.removeOpencodeWorkspace",
+        "title": "AI Rulebook: Remove opencode rule pack",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.removeClaudeWorkspace",
+        "title": "AI Rulebook: Remove Claude Code rule pack",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.removeAllFormatsWorkspace",
+        "title": "AI Rulebook: Remove all rule packs",
         "category": "AI Rulebook"
       },
       {
@@ -128,6 +163,16 @@
         }
       ]
     },
+    "submenus": [
+      {
+        "id": "aiRules.syncSubmenu",
+        "label": "Sync rule packs"
+      },
+      {
+        "id": "aiRules.removeSubmenu",
+        "label": "Remove rule packs"
+      }
+    ],
     "menus": {
       "view/title": [
         {
@@ -156,6 +201,16 @@
           "group": "2_workspace@2"
         },
         {
+          "submenu": "aiRules.syncSubmenu",
+          "when": "view == aiRules.rulesTree",
+          "group": "4_sync@1"
+        },
+        {
+          "submenu": "aiRules.removeSubmenu",
+          "when": "view == aiRules.rulesTree",
+          "group": "5_remove@1"
+        },
+        {
           "command": "aiRules.showCoreStatus",
           "when": "view == aiRules.rulesTree",
           "group": "3_inspect@1"
@@ -164,6 +219,50 @@
           "command": "aiRules.hideRuleColors",
           "when": "view == aiRules.rulesTree",
           "group": "3_inspect@2"
+        }
+      ],
+      "aiRules.syncSubmenu": [
+        {
+          "command": "aiRules.syncAllFormatsWorkspace",
+          "group": "1_all@1"
+        },
+        {
+          "command": "aiRules.syncCursorWorkspace",
+          "group": "2_format@1"
+        },
+        {
+          "command": "aiRules.syncClineWorkspace",
+          "group": "2_format@2"
+        },
+        {
+          "command": "aiRules.syncOpencodeWorkspace",
+          "group": "2_format@3"
+        },
+        {
+          "command": "aiRules.syncClaudeWorkspace",
+          "group": "2_format@4"
+        }
+      ],
+      "aiRules.removeSubmenu": [
+        {
+          "command": "aiRules.removeAllFormatsWorkspace",
+          "group": "1_all@1"
+        },
+        {
+          "command": "aiRules.removeCursorWorkspace",
+          "group": "2_format@1"
+        },
+        {
+          "command": "aiRules.removeClineWorkspace",
+          "group": "2_format@2"
+        },
+        {
+          "command": "aiRules.removeOpencodeWorkspace",
+          "group": "2_format@3"
+        },
+        {
+          "command": "aiRules.removeClaudeWorkspace",
+          "group": "2_format@4"
         }
       ]
     },
