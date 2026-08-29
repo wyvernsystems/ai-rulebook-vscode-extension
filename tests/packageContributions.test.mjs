@@ -94,6 +94,14 @@ describe("VS Code package contributions", () => {
     }
   });
 
+  test("the rule-reveal command is hidden from the command palette", () => {
+    const paletteEntries = contributions.menus.commandPalette ?? [];
+    const hidden = paletteEntries.find((item) => item.command === "aiRules.revealRuleFile");
+
+    assert.ok(hidden, "aiRules.revealRuleFile needs a commandPalette entry");
+    assert.equal(hidden.when, "false");
+  });
+
   test("the sidebar view and welcome content use the runtime tree view identifier", () => {
     const sidebarViews = contributions.views.aiRulesSidebar;
     const welcomeViews = contributions.viewsWelcome.map((welcome) => welcome.view);

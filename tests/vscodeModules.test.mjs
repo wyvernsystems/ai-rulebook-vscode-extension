@@ -7,6 +7,7 @@ import test, { beforeEach, describe } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  ConfigurationTarget,
   resetVscodeMock,
   state,
   TreeItemCheckboxState,
@@ -1236,5 +1237,365 @@ describe("extension activation", () => {
 
   test("deactivate completes without cleanup errors", () => {
     assert.equal(extension.deactivate(), undefined);
+  });
+});
+
+describe("manual sync commands", () => {
+  const DISABLED_RULE = "git.mdc";
+
+  async function activateWithInstalledPack(t, roots) {
+    workspace.workspaceFolders = roots.map((root) => ({ uri: Uri.file(root) }));
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    await rulesOperations.installRulePack(
+      path.join(repoRoot, "bundled", "ai-rules"),
+      rulesOperations.workspaceRulesDir(roots[0]),
+      RULE_FILES,
+      null
+    );
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+    return context;
+  }
+
+  test("syncCursorWorkspace keeps a disabled rule disabled", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    await activateWithInstalledPack(t, [root]);
+    const rulesDir = rulesOperations.workspaceRulesDir(root);
+    await rulesOperations.setRuleEnabled(rulesDir, DISABLED_RULE, false);
+
+    await state.registeredCommands.get("aiRules.syncCursorWorkspace")();
+
+    assert.equal(await rulesOperations.isRuleEnabled(rulesDir, DISABLED_RULE), false);
+    assert.equal(
+      await rulesOperations.pathExists(path.join(rulesDir, `${DISABLED_RULE}.disabled`)),
+      true
+    );
+  });
+
+  test("syncAllFormatsWorkspace keeps a disabled rule disabled in every mirror", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    await activateWithInstalledPack(t, [root]);
+    const rulesDir = rulesOperations.workspaceRulesDir(root);
+    await rulesOperations.setRuleEnabled(rulesDir, DISABLED_RULE, false);
+
+    await state.registeredCommands.get("aiRules.syncAllFormatsWorkspace")();
+
+    assert.equal(await rulesOperations.isRuleEnabled(rulesDir, DISABLED_RULE), false);
+    const disabledMirrors = [
+      path.join(root, ".clinerules", "ai-rules", "ai-rules-git.md"),
+      path.join(root, ".opencode", "rules", "ai-rules", "git.md"),
+      path.join(root, ".claude", "rules", "ai-rules", "git.md"),
+    ];
+    for (const mirror of disabledMirrors) {
+      assert.equal(await rulesOperations.pathExists(mirror), false, `${mirror} should be off`);
+      assert.equal(
+        await rulesOperations.pathExists(`${mirror}.disabled`),
+        true,
+        `${mirror}.disabled should exist`
+      );
+    }
+    assert.equal(
+      await rulesOperations.pathExists(path.join(root, ".claude", "rules", "ai-rules", "code.md")),
+      true
+    );
+  });
+
+  test("syncAllFormatsWorkspace mirrors into every workspace folder", async (t) => {
+    const rootA = await makeTempWorkspace();
+    const rootB = await makeTempWorkspace();
+    t.after(() => {
+      fs.rm(rootA, { recursive: true, force: true });
+      fs.rm(rootB, { recursive: true, force: true });
+    });
+    await activateWithInstalledPack(t, [rootA, rootB]);
+
+    await state.registeredCommands.get("aiRules.syncAllFormatsWorkspace")();
+
+    for (const root of [rootA, rootB]) {
+      assert.equal(
+        await rulesOperations.pathExists(
+          path.join(root, ".clinerules", "ai-rules", "ai-rules-code.md")
+        ),
+        true,
+        `expected ${root} to get the Cline mirror`
+      );
+      assert.equal(
+        await rulesOperations.pathExists(path.join(root, ".opencode", "rules", "ai-rules", "code.md")),
+        true,
+        `expected ${root} to get the opencode mirror`
+      );
+      assert.equal(
+        await rulesOperations.pathExists(path.join(root, ".claude", "rules", "ai-rules", "code.md")),
+        true,
+        `expected ${root} to get the Claude Code mirror`
+      );
+    }
+  });
+
+  test("syncAllFormatsWorkspace still confirms the formats it wrote when the opencode config is skipped", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    await writeFile(path.join(root, "opencode.json"), "{ not json\n");
+    await activateWithInstalledPack(t, [root]);
+    state.informationMessages = [];
+
+    await state.registeredCommands.get("aiRules.syncAllFormatsWorkspace")();
+
+    assert.ok(
+      state.warnings.some((message) => /could not update the opencode config/.test(message)),
+      "expected the opencode config warning"
+    );
+    assert.ok(
+      state.informationMessages.some((message) => /\.claude\/rules\/ai-rules\//.test(message)),
+      "expected confirmation of the formats that were written"
+    );
+  });
+
+  test("sync commands refresh the opencode status bar state", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    await activateWithInstalledPack(t, [root]);
+    const statusBar = state.statusBarItems[0];
+    assert.ok(!statusBar.text.includes("opencode"));
+
+    await state.registeredCommands.get("aiRules.syncOpencodeWorkspace")();
+
+    assert.match(statusBar.text, /opencode ✓/);
+  });
+});
+
+describe("remove commands", () => {
+  async function activateTwoFolders(t) {
+    const rootA = await makeTempWorkspace();
+    const rootB = await makeTempWorkspace();
+    t.after(() => {
+      fs.rm(rootA, { recursive: true, force: true });
+      fs.rm(rootB, { recursive: true, force: true });
+    });
+    workspace.workspaceFolders = [{ uri: Uri.file(rootA) }, { uri: Uri.file(rootB) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    const bundleDir = path.join(repoRoot, "bundled", "ai-rules");
+    for (const root of [rootA, rootB]) {
+      await rulesOperations.installRulePack(
+        bundleDir,
+        rulesOperations.workspaceRulesDir(root),
+        RULE_FILES,
+        null
+      );
+      await rulesOperations.syncBundledMdcsToClinerules(root, bundleDir, RULE_FILES, null);
+      await rulesOperations.syncBundledMdcsToOpencodeRules(root, bundleDir, RULE_FILES, null);
+      await rulesOperations.syncBundledMdcsToClaudeRules(root, bundleDir, RULE_FILES, null);
+    }
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+    return [rootA, rootB];
+  }
+
+  test("a declined confirmation leaves every rule pack in place", async (t) => {
+    const [rootA] = await activateTwoFolders(t);
+    state.warningChoice = "Cancel";
+
+    await state.registeredCommands.get("aiRules.removeAllFormatsWorkspace")();
+
+    assert.equal(
+      await rulesOperations.pathExists(rulesOperations.workspaceRulesDir(rootA)),
+      true
+    );
+  });
+
+  test("removeAllFormatsWorkspace clears every workspace folder", async (t) => {
+    const roots = await activateTwoFolders(t);
+    state.warningChoice = "Remove all rule packs";
+
+    await state.registeredCommands.get("aiRules.removeAllFormatsWorkspace")();
+
+    for (const root of roots) {
+      for (const dir of [
+        rulesOperations.workspaceRulesDir(root),
+        rulesOperations.workspaceClineRulesDir(root),
+        rulesOperations.workspaceOpencodeRulesDir(root),
+        rulesOperations.workspaceClaudeRulesDir(root),
+      ]) {
+        assert.equal(await rulesOperations.pathExists(dir), false, `${dir} should be gone`);
+      }
+      assert.equal(
+        await rulesOperations.pathExists(
+          path.join(root, ".opencode", "command", "ai-rulebook.md")
+        ),
+        false
+      );
+    }
+  });
+
+  test("per-format remove commands clear every workspace folder", async (t) => {
+    const roots = await activateTwoFolders(t);
+    state.warningChoice = "Remove Cline rules";
+
+    await state.registeredCommands.get("aiRules.removeClineWorkspace")();
+
+    for (const root of roots) {
+      assert.equal(
+        await rulesOperations.pathExists(rulesOperations.workspaceClineRulesDir(root)),
+        false,
+        `expected ${root} Cline rules to be removed`
+      );
+    }
+  });
+
+  test("removing the opencode rules refreshes the status bar", async (t) => {
+    const roots = await activateTwoFolders(t);
+    await state.registeredCommands.get("aiRules.syncOpencodeWorkspace")();
+    const statusBar = state.statusBarItems[0];
+    assert.match(statusBar.text, /opencode ✓/);
+    state.warningChoice = "Remove opencode rules";
+
+    await state.registeredCommands.get("aiRules.removeOpencodeWorkspace")();
+
+    assert.ok(!statusBar.text.includes("opencode"), `unexpected status bar text: ${statusBar.text}`);
+    assert.equal(roots.length, 2);
+  });
+});
+
+describe("rule toggles without an installed rule pack", () => {
+  async function activateWithoutRules(t) {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    await writeFile(path.join(root, "CLAUDE.md"), "# project\n");
+    workspace.workspaceFolders = [{ uri: Uri.file(root) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+    return root;
+  }
+
+  test("enableCoreWorkspace reports the missing rule pack instead of a false success", async (t) => {
+    await activateWithoutRules(t);
+    state.informationMessages = [];
+
+    await state.registeredCommands.get("aiRules.enableCoreWorkspace")();
+
+    assert.ok(
+      state.errors.some((message) => /Install \/ update rule pack/.test(message)),
+      `expected an install hint, got ${JSON.stringify(state.errors)}`
+    );
+    assert.deepEqual(state.informationMessages, []);
+  });
+
+  test("disableRuleWorkspace reports the missing rule pack instead of a false success", async (t) => {
+    await activateWithoutRules(t);
+    state.quickPickSelection = SAMPLE_RULE;
+    state.informationMessages = [];
+
+    await state.registeredCommands.get("aiRules.disableRuleWorkspace")();
+
+    assert.ok(
+      state.errors.some((message) => /Install \/ update rule pack/.test(message)),
+      `expected an install hint, got ${JSON.stringify(state.errors)}`
+    );
+    assert.deepEqual(state.informationMessages, []);
+  });
+
+  test("sidebar checkbox toggles warn instead of silently doing nothing", async (t) => {
+    const root = await activateWithoutRules(t);
+    const view = state.treeViews[0];
+
+    await view.emitCheckboxState([
+      [{ kind: "rule", ruleFile: SAMPLE_RULE }, TreeItemCheckboxState.Unchecked],
+    ]);
+
+    assert.ok(
+      state.warnings.some((message) => /Install \/ update rule pack/.test(message)),
+      `expected an install hint, got ${JSON.stringify(state.warnings)}`
+    );
+    assert.equal(
+      await rulesOperations.pathExists(path.join(root, ".claude", "rules", "ai-rules", SAMPLE_RULE)),
+      false
+    );
+  });
+});
+
+describe("Explorer color commands", () => {
+  const SETTING = "aiRules.colorRulesInExplorer";
+
+  async function activateWithWorkspace(t) {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(root) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+    return root;
+  }
+
+  test("hideRuleColors turns the tint off at the User scope by default", async (t) => {
+    await activateWithWorkspace(t);
+
+    await state.registeredCommands.get("aiRules.hideRuleColors")();
+
+    assert.deepEqual(
+      state.configurationUpdates.map(({ section, key, value, target }) => ({
+        section,
+        key,
+        value,
+        target,
+      })),
+      [
+        {
+          section: "aiRules",
+          key: "colorRulesInExplorer",
+          value: false,
+          target: ConfigurationTarget.Global,
+        },
+      ]
+    );
+  });
+
+  test("hideRuleColors writes to the workspace scope that overrides the value", async (t) => {
+    await activateWithWorkspace(t);
+    state.configurationInspections.set(SETTING, { globalValue: true, workspaceValue: true });
+
+    await state.registeredCommands.get("aiRules.hideRuleColors")();
+
+    assert.equal(state.configurationUpdates.at(-1).target, ConfigurationTarget.Workspace);
+  });
+
+  test("hideRuleColors never targets a workspace folder, which needs a resource", async (t) => {
+    await activateWithWorkspace(t);
+    state.configurationInspections.set(SETTING, { workspaceFolderValue: true });
+
+    await state.registeredCommands.get("aiRules.hideRuleColors")();
+
+    const update = state.configurationUpdates.at(-1);
+    assert.notEqual(
+      update.target,
+      ConfigurationTarget.WorkspaceFolder,
+      "a folder-scoped update on a resource-less configuration is rejected by VS Code"
+    );
+    assert.equal(update.value, false);
+    assert.deepEqual(state.errors, []);
+  });
+
+  test("showCoreStatus turns the tint back on and reports rule state", async (t) => {
+    const root = await activateWithWorkspace(t);
+    await rulesOperations.installRulePack(
+      path.join(repoRoot, "bundled", "ai-rules"),
+      rulesOperations.workspaceRulesDir(root),
+      RULE_FILES,
+      null
+    );
+    state.configuration.set(SETTING, false);
+
+    await state.registeredCommands.get("aiRules.showCoreStatus")();
+
+    assert.equal(state.configurationUpdates.at(-1).value, true);
+    assert.equal(state.configuration.get(SETTING), true);
+    assert.ok(
+      state.executedCommands.some(([id]) => id === "aiRules.rulesTree.focus"),
+      "expected the sidebar to be focused"
+    );
+    assert.ok(state.outputChannels[0].lines.some((line) => line === `active\t${SAMPLE_RULE}`));
+    assert.deepEqual(state.errors, []);
   });
 });

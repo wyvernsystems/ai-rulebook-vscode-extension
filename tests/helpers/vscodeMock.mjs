@@ -13,6 +13,10 @@ export const state = {
   executedCommands: [],
   quickPickRequests: [],
   quickPickSelection: undefined,
+  warningRequests: [],
+  warningChoice: undefined,
+  configurationInspections: new Map(),
+  configurationUpdates: [],
 };
 
 export class EventEmitter {
@@ -156,13 +160,29 @@ export const env = {
   appName: "Visual Studio Code",
 };
 
+export const ConfigurationTarget = {
+  Global: 1,
+  Workspace: 2,
+  WorkspaceFolder: 3,
+};
+
 export const workspace = {
   workspaceFolders: undefined,
 
-  getConfiguration(section) {
+  getConfiguration(section, resource) {
     return {
-      get(key) {
-        return state.configuration.get(`${section}.${key}`);
+      get(key, defaultValue) {
+        const value = state.configuration.get(`${section}.${key}`);
+        return value === undefined ? defaultValue : value;
+      },
+
+      inspect(key) {
+        return state.configurationInspections.get(`${section}.${key}`);
+      },
+
+      async update(key, value, target) {
+        state.configurationUpdates.push({ section, key, value, target, resource });
+        state.configuration.set(`${section}.${key}`, value);
       },
     };
   },
@@ -220,8 +240,14 @@ export const window = {
     return state.quickPickSelection;
   },
 
-  async showWarningMessage(message) {
+  async showWarningMessage(message, ...rest) {
     state.warnings.push(message);
+    state.warningRequests.push({
+      message,
+      modal: rest.some((arg) => arg && typeof arg === "object" && arg.modal === true),
+      actions: rest.filter((arg) => typeof arg === "string"),
+    });
+    return state.warningChoice;
   },
 
   async showErrorMessage(message) {
@@ -261,12 +287,17 @@ export function resetVscodeMock() {
   state.executedCommands = [];
   state.quickPickRequests = [];
   state.quickPickSelection = undefined;
+  state.warningRequests = [];
+  state.warningChoice = undefined;
+  state.configurationInspections.clear();
+  state.configurationUpdates = [];
   workspace.workspaceFolders = undefined;
   env.uriScheme = "vscode";
   env.appName = "Visual Studio Code";
 }
 
 export const vscode = {
+  ConfigurationTarget,
   EventEmitter,
   MarkdownString,
   StatusBarAlignment,

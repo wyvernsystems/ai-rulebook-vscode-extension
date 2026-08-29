@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import {
   isRuleEnabled,
+  pathExists,
   setRuleEnabled,
   workspaceRulesDir,
 } from "./rulesOperations";
@@ -146,8 +147,9 @@ export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
 
 /**
  * Wires the tree view to checkbox events: a single click on a checkbox flips
- * the rule's `.mdc` ↔ `.mdc.disabled` rename. A workspace must be open—if not,
- * we surface a friendly hint instead of silently failing.
+ * the rule's `.mdc` ↔ `.mdc.disabled` rename. A workspace must be open and the
+ * rule pack must be installed in it—without either, the rename has nothing to
+ * act on, so we surface a friendly hint instead of silently failing.
  *
  * `onRuleToggle` (optional) is invoked after every successful toggle with the
  * rule file and its new state. It lets the caller propagate the change to
@@ -173,6 +175,13 @@ export function bindRulesTreeView(
       return;
     }
     const rulesDir = workspaceRulesDir(root);
+    if (!(await pathExists(rulesDir))) {
+      vscode.window.showWarningMessage(
+        'AI Rulebook: no rule pack in this workspace yet — run "AI Rulebook: Install / update rule pack" first.'
+      );
+      provider.refresh();
+      return;
+    }
     for (const [node, state] of e.items) {
       const enable = state === vscode.TreeItemCheckboxState.Checked;
       try {

@@ -5,6 +5,45 @@ engineering rules for AI coding agents into your project. It supports Cursor,
 Cline, opencode, and Claude Code. The six topic rules cover scope, code reuse,
 testing, docs, Markdown, and Git. A sidebar lets you turn each rule on and off.
 
+## Commands
+
+Every command is available from the command palette (`Ctrl/Cmd+Shift+P`) under
+the **AI Rulebook** category. The sync and remove commands also appear in the
+**AI Rulebook** sidebar's toolbar menu, under **Sync rule packs** and
+**Remove rule packs**.
+
+| Command | What it does |
+| --- | --- |
+| **Install / update rule pack** | Writes the bundled rules into `.cursor/rules/ai-rules/`, then mirrors to Cline, opencode, and Claude Code wherever they apply. Every rule is (re-)enabled. |
+| **Reset rule pack to defaults…** | Replaces the whole `.cursor/rules/ai-rules/` folder with the bundled copy after a confirmation, deleting extra files you added there. |
+| **Enable all rules (workspace)** | Turns every rule on and updates each mirror. |
+| **Disable all rules (workspace)** | Turns every rule off and updates each mirror. |
+| **Enable one rule…** | Picks a rule from a list and turns it on, updating each mirror. |
+| **Disable one rule…** | Picks a rule from a list and turns it off, updating each mirror. |
+| **Sync rule pack to Cursor** | Refreshes `.cursor/rules/ai-rules/` from the bundle, keeping each rule's on / off state. |
+| **Sync rule pack to Cline** | Writes `.clinerules/ai-rules/` in every open folder, whether or not Cline is installed. |
+| **Sync rule pack to opencode** | Writes `.opencode/rules/ai-rules/`, registers the glob in the opencode config, and adds the `/ai-rulebook` command — in every open folder. |
+| **Sync rule pack to Claude Code** | Writes `.claude/rules/ai-rules/` in every open folder. |
+| **Sync rule pack to all formats** | Runs all four syncs in one step, keeping each rule's on / off state. |
+| **Remove Cursor rule pack** | Deletes `.cursor/rules/ai-rules/` after a confirmation. |
+| **Remove Cline rule pack** | Deletes `.clinerules/ai-rules/` after a confirmation. |
+| **Remove opencode rule pack** | Deletes `.opencode/rules/ai-rules/` and the `/ai-rulebook` command after a confirmation. The config `instructions` entry is left alone. |
+| **Remove Claude Code rule pack** | Deletes `.claude/rules/ai-rules/` after a confirmation. |
+| **Remove all rule packs** | Deletes all four rule folders after a confirmation. |
+| **Show rule pack status** | Turns Explorer rule colors back on, focuses the sidebar, and writes the on / off state to the **AI Rulebook** output channel. |
+| **Hide rule colors** | Turns off the green / red tint on rule files in the Explorer. The sidebar keeps its colors. |
+| **Refresh sidebar** | Re-reads rule state from disk and repaints the sidebar and status bar. |
+
+The remove commands and the Cline / opencode / Claude Code syncs apply to
+every open workspace folder. Anything touching `.cursor/rules/ai-rules/` —
+install, reset, sync to Cursor, and the rule toggles — applies to the first
+workspace folder only.
+
+**Sync vs. install**: the *Sync* commands push what the sidebar currently
+shows, so a rule you turned off stays off in every format. *Install / update*
+and *Reset to defaults* deliberately start from the bundled defaults, which
+turns every rule back on.
+
 ## The rules
 
 - **`scope.mdc`** — change only what the task requires; tests and docs for
@@ -172,11 +211,16 @@ sync: enabled rules stay as `<topic>.md`, disabled rules become
 - Rule files installed under `.cursor/rules/ai-rules/` are editable; the
   extension only overwrites them on install, update, or reset.
 - A status bar item shows the enabled-rule count (`AI 5/6`) and the opencode
-  config sync state; click it to run **Sync rule pack to opencode**.
+  config sync state; click it to run **Sync rule pack to opencode**. It is
+  refreshed after every command that writes or deletes rule files.
 - In a multi-root workspace, Cline/opencode/Claude Code mirroring and their
   manual sync commands run in every open folder that shows evidence for that
-  tool. The `.cursor/rules/ai-rules/` install itself — and the sidebar rule
-  toggles — apply to the first workspace folder only.
+  tool, and the remove commands clear every open folder. The
+  `.cursor/rules/ai-rules/` install itself — and the sidebar rule toggles —
+  apply to the first workspace folder only.
+- Rule toggles rename files inside `.cursor/rules/ai-rules/`, so they need
+  that folder to exist. Without it the sidebar checkboxes and the
+  enable / disable commands report that the rule pack is not installed yet.
 
 ## Development
 
@@ -194,8 +238,10 @@ folders under `bundled/rule-packs/` — commit both alongside the rule change.
 Source rules hold the `{{TEST_COMMAND}}` token verbatim; the extension
 substitutes the project's real command on the way into a workspace. The
 `.cursor/rules/ai-rules/` folder in this repo is that rendered install — it is
-gitignored, absent on a fresh clone, and must not be edited as if it were the
-source.
+committed like any other generated rule folder, so it is not byte-identical to
+the source and must not be edited as if it were the source. Change a rule in
+`bundled/ai-rules/`, then re-run the install or **Sync rule pack to Cursor** to
+regenerate it.
 
 Requirements are tracked in [docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md).
 Cutting a release is documented in [docs/DEPLOY.md](./docs/DEPLOY.md).

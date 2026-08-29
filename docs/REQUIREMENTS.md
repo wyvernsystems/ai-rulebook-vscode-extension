@@ -47,7 +47,7 @@ details belong in the code or in the rule files.
   folder (`AI 5/6`) plus the opencode config sync state (`✓` synced, `✗`
   skipped). Clicking it runs `AI Rulebook: Sync rule pack to opencode`. It is
   populated on activation and refreshed after every action that changes rule
-  state.
+  state, including the mirror-only sync and remove commands.
 - A pair of commands toggles the Explorer tint at the User scope without
   touching the sidebar:
   - `AI Rulebook: Hide rule colors` sets
@@ -56,9 +56,10 @@ details belong in the code or in the rule files.
     (idempotent), focuses the sidebar, and writes a plain-text snapshot to
     the Output channel.
 - Source of truth for rule text is `bundled/ai-rules/`, the copy shipped in
-  the VSIX. The workspace copy at `.cursor/rules/ai-rules/` is a generated,
-  gitignored install that the extension renders per project, so it is not
-  byte-identical to the source and is absent on a fresh clone.
+  the VSIX. The workspace copy at `.cursor/rules/ai-rules/` is a generated
+  install that the extension renders per project, so it is not byte-identical
+  to the source. The extension never writes a `.gitignore`: every generated
+  rule folder is left tracked so a team can commit and share it.
 - `npm run verify:bundled` must pass before packaging. It checks that
   `bundled/manifest.json` lists exactly the rules in `bundled/ai-rules/`, that
   every rule has a `description` in its frontmatter, and that no rule carries
@@ -68,11 +69,10 @@ details belong in the code or in the rule files.
   each a ready-to-copy `ai-rules/` folder rendered from `bundled/ai-rules/`
   using the same conversion rules as the corresponding workspace mirror
   (`{{TEST_COMMAND}}` rendered as generic prose, since there is no project).
-  These folders are tracked in git — unlike the gitignored workspace
-  mirrors — so someone can browse or grab a tool's rules directly from the
-  repo without installing the extension. They are excluded from the VSIX
-  itself (`.vscodeignore`) since the extension only ever reads from
-  `bundled/ai-rules/`.
+  These folders are tracked in git, so someone can browse or grab a tool's
+  rules directly from the repo without installing the extension. They are
+  excluded from the VSIX itself (`.vscodeignore`) since the extension only
+  ever reads from `bundled/ai-rules/`.
 - `npm run package-rule-packs` zips each `bundled/rule-packs/<tool>/` folder
   into `ai-rulebook-rules-<tool>-X.Y.Z.zip` at the repository root, for
   attaching to a GitHub release alongside the `.vsix` (see DEPLOY.md). The
@@ -146,11 +146,27 @@ details belong in the code or in the rule files.
   host application or `aiRules.installCursorRulesFolder`.
 - The `AI Rulebook: Sync rule pack to all formats` command writes every
   supported mirror (Cursor, Cline, opencode, and Claude Code) in one step,
-  ignoring every auto-sync gate.
+  ignoring every auto-sync gate. The `.cursor/` install targets the first
+  workspace folder; the three mirrors are written in every open folder, as
+  the per-format sync commands do.
+- Every `Sync rule pack to …` command preserves each rule's on / off state,
+  so a disabled rule stays disabled in the format it writes. Only
+  `Install / update rule pack` and `Reset rule pack to defaults` converge the
+  pack back to the bundled defaults, where every rule is enabled.
 - Remove commands delete `.cursor/rules/ai-rules/`, `.clinerules/ai-rules/`,
   `.opencode/rules/ai-rules/`, or `.claude/rules/ai-rules/` individually, or
-  all four at once after a confirmation dialog. Removing opencode rules does
-  not edit the opencode config `instructions` array.
+  all four at once after a confirmation dialog. They clear every open
+  workspace folder, and the confirmation says so when more than one is open.
+  Removing opencode rules does not edit the opencode config `instructions`
+  array.
+- The rule on / off commands and the sidebar checkboxes require
+  `.cursor/rules/ai-rules/` to exist, since a toggle is a rename inside that
+  folder. When it is missing they report that the rule pack is not installed
+  and name the install command, instead of reporting a success that changed
+  nothing.
+- `AI Rulebook: Open rule file` is invoked by the sidebar with the rule to
+  open and is hidden from the command palette, where it would have no
+  argument to act on.
 - Manual sync and remove commands are exposed in the Rule Pack sidebar under
   **Sync rule packs** and **Remove rule packs** submenus. None are hidden
   based on whether the host is Cursor or plain VS Code.

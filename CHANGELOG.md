@@ -6,6 +6,52 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Command reference in the README.** Every contributed command is now listed
+  in a table with what it writes and which workspace folders it touches.
+
+### Changed
+
+- **Docs corrected**: the README, requirements, and deploy notes described
+  `.cursor/rules/ai-rules/` as gitignored and absent on a fresh clone. The
+  extension never writes a `.gitignore`, and that folder is committed in this
+  repo like any other generated rule folder.
+
+### Fixed
+
+- **`Sync rule pack to all formats` no longer re-enables disabled rules.** It
+  refreshed `.cursor/rules/ai-rules/` from the bundle before generating the
+  mirrors, so every rule you had turned off came back on in all four formats.
+  The sync commands now preserve rule state; `Install / update rule pack` and
+  `Reset rule pack to defaults` still start from the bundled defaults.
+- **`Sync rule pack to Cursor` no longer re-enables disabled rules**, for the
+  same reason.
+- **`Sync rule pack to all formats` now mirrors into every workspace folder.**
+  It only wrote the first one, while the per-format sync commands wrote all of
+  them. The `.cursor/` install stays scoped to the first folder.
+- **`Sync rule pack to all formats` confirms what it wrote** when the opencode
+  config could not be updated. It previously showed only the opencode warning,
+  leaving the other three formats unacknowledged.
+- **The status bar no longer goes stale.** The Cline, opencode, and Claude Code
+  sync and remove commands did not refresh it, so clicking the status bar to
+  sync opencode left its own indicator unchanged.
+- **Remove commands now clear every workspace folder.** In a multi-root
+  workspace they deleted only the first folder's rule packs while reporting
+  that everything was removed. The confirmation dialog names the folder count.
+- **Rule toggles no longer report a false success.** With no
+  `.cursor/rules/ai-rules/` folder, the enable / disable commands and the
+  sidebar checkboxes silently did nothing and still reported success. They now
+  point at `Install / update rule pack`.
+- **`AI Rulebook: Open rule file` is hidden from the command palette.** It
+  needs a rule argument from the sidebar and did nothing when run from the
+  palette.
+- **`Hide rule colors` can no longer aim at a folder-scoped update.**
+  `aiRules.colorRulesInExplorer` is window-scoped, so VS Code never resolves a
+  per-folder value for it and rejects a `WorkspaceFolder` update on a
+  configuration read without a resource. The command now writes to the
+  Workspace scope when one overrides the value, and the User scope otherwise.
+
 ## [2.9.0] - 2026-08-29
 
 ### Added

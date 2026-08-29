@@ -108,14 +108,52 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const treeProvider = new RulesTreeProvider(mdcs);
   treeProvider.onAfterRefresh(() => sidebarColors.refresh());
   treeProvider.onAfterRefresh(() => explorerColors.refresh());
+
+  /**
+   * Status bar element: shows the enabled-rule count in the first workspace
+   * folder plus the opencode mirror state, and clicks through to the manual
+   * opencode sync command.
+   */
+  const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
+  statusBarItem.name = "AI Rulebook";
+  statusBarItem.command = "aiRules.syncOpencodeWorkspace";
+  statusBarItem.show();
+  context.subscriptions.push(statusBarItem);
+
+  const updateStatusBar = async (): Promise<void> => {
+    const root = workspaceRoots()[0];
+    if (!root) {
+      statusBarItem.text = "$(checklist) AI Rulebook";
+      statusBarItem.tooltip = "AI Rulebook: open a folder to install the rule pack.";
+      return;
+    }
+    const rulesDir = workspaceRulesDir(root);
+    let enabledCount = 0;
+    for (const ruleFile of mdcs) {
+      if (await isRuleEnabled(rulesDir, ruleFile)) {
+        enabledCount++;
+      }
+    }
+    const opencodeState = await opencodeSyncStatus(root);
+    const opencodeSuffix =
+      opencodeState === "synced" ? " · opencode ✓" : opencodeState === "skipped" ? " · opencode ✗" : "";
+    statusBarItem.text = `$(checklist) AI ${enabledCount}/${mdcs.length}${opencodeSuffix}`;
+    statusBarItem.tooltip =
+      `AI Rulebook: ${enabledCount}/${mdcs.length} rules enabled in the first workspace folder.\n` +
+      "Click to sync the rule pack to opencode.";
+  };
+
   /**
    * Refresh handle used after every action that changes rule state on disk.
    * `treeProvider.refresh()` also fires every registered decoration provider
-   * via `onAfterRefresh`, so call sites only need to refresh the tree.
+   * via `onAfterRefresh`; the status bar reads the disk asynchronously, so it
+   * is awaited here rather than fired and forgotten. Every command that writes
+   * or deletes rule files must await this, including the mirror-only sync and
+   * remove commands—the status bar reports the opencode mirror state too.
    */
-  const refreshSidebar = (): Promise<void> => {
+  const refreshUi = async (): Promise<void> => {
     treeProvider.refresh();
-    return Promise.resolve();
+    await updateStatusBar();
   };
 
   const ensureWorkspace = (): string => {
@@ -124,6 +162,54 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       throw new Error("Open a folder in VS Code first.");
     }
     return folder;
+  };
+
+  /** Every open workspace folder, or a clear error when none is open. */
+  const ensureWorkspaces = (): string[] => {
+    const roots = workspaceRoots();
+    if (roots.length === 0) {
+      throw new Error("Open a folder in VS Code first.");
+    }
+    return roots;
+  };
+
+  /**
+   * Guards the rule on / off commands: toggling renames `<rule>.mdc` to
+   * `<rule>.mdc.disabled` in `.cursor/rules/ai-rules/`, so with no rules folder
+   * there is nothing to rename and the toggle would silently do nothing while
+   * still reporting success.
+   */
+  const ensureRulePackInstalled = async (rulesDir: string): Promise<void> => {
+    if (!(await pathExists(rulesDir))) {
+      throw new Error(
+        "No rule pack in this workspace yet — run \"AI Rulebook: Install / update rule pack\" first."
+      );
+    }
+  };
+
+  /**
+   * Refreshes `.cursor/rules/ai-rules/` from the bundle while preserving each
+   * rule's on / off state. `installRulePack` deliberately converges every rule
+   * to enabled, which is what "Install / update" and "Reset to defaults" mean;
+   * a *sync* must not silently re-enable rules the user turned off, because the
+   * mirrors it then writes are generated from that state.
+   */
+  const refreshCursorRulesPreservingState = async (
+    rulesDir: string,
+    testCommand: TestCommand
+  ): Promise<void> => {
+    const disabledBefore: string[] = [];
+    if (await pathExists(rulesDir)) {
+      for (const ruleFile of mdcs) {
+        if (!(await isRuleEnabled(rulesDir, ruleFile))) {
+          disabledBefore.push(ruleFile);
+        }
+      }
+    }
+    await installRulePack(bundleDir, rulesDir, mdcs, testCommand);
+    for (const ruleFile of disabledBefore) {
+      await setRuleEnabled(rulesDir, ruleFile, false);
+    }
   };
 
   /**
@@ -219,42 +305,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   };
 
-  bindRulesTreeView(context, treeProvider, refreshSidebar, propagateRuleToggle);
-
-  /**
-   * Status bar element: shows the enabled-rule count in the first workspace
-   * folder plus the opencode mirror state, and clicks through to the manual
-   * opencode sync command.
-   */
-  const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
-  statusBarItem.name = "AI Rulebook";
-  statusBarItem.command = "aiRules.syncOpencodeWorkspace";
-  statusBarItem.show();
-  context.subscriptions.push(statusBarItem);
-
-  const updateStatusBar = async (): Promise<void> => {
-    const root = workspaceRoots()[0];
-    if (!root) {
-      statusBarItem.text = "$(checklist) AI Rulebook";
-      statusBarItem.tooltip = "AI Rulebook: open a folder to install the rule pack.";
-      return;
-    }
-    const rulesDir = workspaceRulesDir(root);
-    let enabledCount = 0;
-    for (const ruleFile of mdcs) {
-      if (await isRuleEnabled(rulesDir, ruleFile)) {
-        enabledCount++;
-      }
-    }
-    const opencodeState = await opencodeSyncStatus(root);
-    const opencodeSuffix =
-      opencodeState === "synced" ? " · opencode ✓" : opencodeState === "skipped" ? " · opencode ✗" : "";
-    statusBarItem.text = `$(checklist) AI ${enabledCount}/${mdcs.length}${opencodeSuffix}`;
-    statusBarItem.tooltip =
-      `AI Rulebook: ${enabledCount}/${mdcs.length} rules enabled in the first workspace folder.\n` +
-      "Click to sync the rule pack to opencode.";
-  };
-  treeProvider.onAfterRefresh(() => void updateStatusBar());
+  bindRulesTreeView(context, treeProvider, refreshUi, propagateRuleToggle);
 
   let clineWasInstalled = isClineInstalled();
   context.subscriptions.push(
@@ -370,7 +421,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         );
       }
       await maybeShowNonCursorNotice();
-      treeProvider.refresh();
+      await refreshUi();
       return;
     }
 
@@ -389,7 +440,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     vscode.window.showInformationMessage(parts.join(" "));
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
-    treeProvider.refresh();
+    await refreshUi();
   };
 
   context.subscriptions.push(
@@ -431,11 +482,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     vscode.window.showInformationMessage(parts.join(" "));
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
-    treeProvider.refresh();
+    await refreshUi();
   });
 
   const setSelectedRuleEnabled = async (enabled: boolean): Promise<void> => {
     const root = ensureWorkspace();
+    const rulesDir = workspaceRulesDir(root);
+    await ensureRulePackInstalled(rulesDir);
     const action = enabled ? "enable" : "disable";
     const ruleFile = await vscode.window.showQuickPick(mdcs, {
       placeHolder: `Select a rule to ${action}`,
@@ -443,14 +496,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!ruleFile) {
       return;
     }
-    const rulesDir = workspaceRulesDir(root);
     await setRuleEnabled(rulesDir, ruleFile, enabled);
     await propagateRuleToggle(ruleFile, enabled);
     vscode.window.showInformationMessage(
       `AI Rulebook: ${ruleFile} ${enabled ? "enabled" : "disabled"} in this workspace.`
     );
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
-    treeProvider.refresh();
+    await refreshUi();
   };
 
   register("aiRules.enableRuleWorkspace", () => setSelectedRuleEnabled(true));
@@ -459,43 +511,47 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   register("aiRules.enableCoreWorkspace", async () => {
     const root = ensureWorkspace();
     const rulesDir = workspaceRulesDir(root);
+    await ensureRulePackInstalled(rulesDir);
     await Promise.all(mdcs.map((ruleFile) => setRuleEnabled(rulesDir, ruleFile, true)));
     await syncMirrorsFromWorkspace();
     vscode.window.showInformationMessage("AI Rulebook: all rules enabled in this workspace.");
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
-    treeProvider.refresh();
+    await refreshUi();
   });
 
   register("aiRules.disableCoreWorkspace", async () => {
     const root = ensureWorkspace();
     const rulesDir = workspaceRulesDir(root);
+    await ensureRulePackInstalled(rulesDir);
     await Promise.all(mdcs.map((ruleFile) => setRuleEnabled(rulesDir, ruleFile, false)));
     await syncMirrorsFromWorkspace();
     vscode.window.showInformationMessage("AI Rulebook: all rules disabled in this workspace.");
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
-    treeProvider.refresh();
+    await refreshUi();
   });
 
   /**
    * Writes `aiRules.colorRulesInExplorer` to whichever scope is currently
    * overriding the value, so toggling actually flips the *effective* value:
    *
-   *   - if the user set it per-folder, update that folder
-   *   - else if it's set at the workspace level, update the workspace
+   *   - if it's set at the workspace level, update the workspace
    *   - else update the User (Global) scope
    *
    * Without this, "Hide rule colors" silently no-ops when a Workspace-level
    * `true` shadows our `Global` write.
+   *
+   * `ConfigurationTarget.WorkspaceFolder` is deliberately not a candidate.
+   * The setting is window-scoped (it has no `scope` in package.json), so VS
+   * Code never resolves a per-folder value for it, and updating that target on
+   * a configuration obtained without a resource is rejected outright.
    */
   const setColorRulesInExplorer = async (enabled: boolean): Promise<void> => {
     const cfg = vscode.workspace.getConfiguration("aiRules");
     const inspect = cfg.inspect<boolean>("colorRulesInExplorer");
-    let target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Global;
-    if (inspect?.workspaceFolderValue !== undefined) {
-      target = vscode.ConfigurationTarget.WorkspaceFolder;
-    } else if (inspect?.workspaceValue !== undefined) {
-      target = vscode.ConfigurationTarget.Workspace;
-    }
+    const target =
+      inspect?.workspaceValue !== undefined
+        ? vscode.ConfigurationTarget.Workspace
+        : vscode.ConfigurationTarget.Global;
     await cfg.update("colorRulesInExplorer", enabled, target);
   };
 
@@ -511,7 +567,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await setColorRulesInExplorer(true);
     }
     explorerColors.refresh();
-    treeProvider.refresh();
+    await refreshUi();
     await vscode.commands.executeCommand(`${RULES_TREE_VIEW_ID}.focus`);
     await showRulePackStatusInOutput(rulesOutput, workspaceRulesDir(root), mdcs);
   });
@@ -539,13 +595,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       throw new Error(`Missing bundle at ${bundleDir}`);
     }
     const rulesDir = workspaceRulesDir(root);
-    const testCommand = await detectTestCommand(root);
-    await installRulePack(bundleDir, rulesDir, mdcs, testCommand);
+    await refreshCursorRulesPreservingState(rulesDir, await detectTestCommand(root));
     vscode.window.showInformationMessage(
       "AI Rulebook: wrote the rule pack to `.cursor/rules/ai-rules/`."
     );
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
-    treeProvider.refresh();
+    await refreshUi();
   });
 
   register("aiRules.syncClineWorkspace", async () => {
@@ -560,6 +615,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       "AI Rulebook: wrote the rule pack to `.clinerules/ai-rules/`" +
         (roots.length > 1 ? ` in ${roots.length} folders.` : ".")
     );
+    await refreshUi();
   });
 
   register("aiRules.syncOpencodeWorkspace", async () => {
@@ -585,12 +641,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           "update the opencode config (unrecognized format). Add " +
           `"instructions": ["${OPENCODE_RULES_GLOB}"] to your opencode config manually.`
       );
-      return;
+    } else {
+      vscode.window.showInformationMessage(
+        "AI Rulebook: wrote the rule pack to `.opencode/rules/ai-rules/`" +
+          (roots.length > 1 ? ` in ${roots.length} folders.` : ".")
+      );
     }
-    vscode.window.showInformationMessage(
-      "AI Rulebook: wrote the rule pack to `.opencode/rules/ai-rules/`" +
-        (roots.length > 1 ? ` in ${roots.length} folders.` : ".")
-    );
+    await refreshUi();
   });
 
   register("aiRules.syncClaudeWorkspace", async () => {
@@ -605,46 +662,87 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       "AI Rulebook: wrote the rule pack to `.claude/rules/ai-rules/`" +
         (roots.length > 1 ? ` in ${roots.length} folders.` : ".")
     );
+    await refreshUi();
   });
 
+  /**
+   * Writes every supported format in one step. The `.cursor/` install applies
+   * to the first workspace folder only (the sidebar toggles read that folder),
+   * while the Cline / opencode / Claude Code mirrors are written in every open
+   * folder, matching the per-format sync commands.
+   */
   register("aiRules.syncAllFormatsWorkspace", async () => {
-    const root = ensureWorkspace();
+    const roots = ensureWorkspaces();
     if (!(await pathExists(bundleDir))) {
       throw new Error(`Missing bundle at ${bundleDir}`);
     }
-    const rulesDir = workspaceRulesDir(root);
-    const testCommand = await detectTestCommand(root);
-    await installRulePack(bundleDir, rulesDir, mdcs, testCommand);
-    await syncBundledMdcsToClinerules(root, bundleDir, mdcs, testCommand);
-    const opencodeResult = await syncRulePackToOpencode(root, bundleDir, mdcs, testCommand);
-    await syncRulePackToClaude(root, bundleDir, mdcs, testCommand);
+    const rulesDir = workspaceRulesDir(roots[0]);
+    await refreshCursorRulesPreservingState(rulesDir, await detectTestCommand(roots[0]));
 
-    const parts = [
-      "AI Rulebook: synced the rule pack to `.cursor/rules/ai-rules/`, `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`, and `.claude/rules/ai-rules/`.",
-    ];
-    if (opencodeResult === "skipped") {
+    let opencodeSkipped = false;
+    for (const target of roots) {
+      const testCommand = await detectTestCommand(target);
+      await syncBundledMdcsToClinerules(target, bundleDir, mdcs, testCommand);
+      if ((await syncRulePackToOpencode(target, bundleDir, mdcs, testCommand)) === "skipped") {
+        opencodeSkipped = true;
+      }
+      await syncRulePackToClaude(target, bundleDir, mdcs, testCommand);
+    }
+
+    vscode.window.showInformationMessage(
+      "AI Rulebook: synced the rule pack to `.cursor/rules/ai-rules/`, " +
+        "`.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`, and `.claude/rules/ai-rules/`" +
+        (roots.length > 1
+          ? ` (Cursor in the first folder, the mirrors in all ${roots.length}).`
+          : ".")
+    );
+    if (opencodeSkipped) {
       vscode.window.showWarningMessage(
         'AI Rulebook: wrote the opencode rule files but could not update the opencode config ' +
           "(unrecognized format). Add " +
           `"instructions": ["${OPENCODE_RULES_GLOB}"] to your opencode config manually.`
       );
-    } else {
-      vscode.window.showInformationMessage(parts.join(" "));
     }
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
-    treeProvider.refresh();
+    await refreshUi();
   });
 
   const confirmDestructive = async (message: string, action: string): Promise<boolean> => {
-    const choice = await vscode.window.showWarningMessage(message, { modal: true }, action, "Cancel");
+    const roots = workspaceRoots();
+    const scope =
+      roots.length > 1 ? `\n\nThis applies to all ${roots.length} open workspace folders.` : "";
+    const choice = await vscode.window.showWarningMessage(
+      `${message}${scope}`,
+      { modal: true },
+      action,
+      "Cancel"
+    );
     return choice === action;
   };
 
   const formatRemovalMessage = (removed: boolean, label: string): string =>
     removed ? `${label}: removed.` : `${label}: nothing to remove.`;
 
+  /**
+   * Runs a per-folder removal in every open workspace folder and reports
+   * whether anything was removed anywhere. Remove commands mirror the sync
+   * commands, which write into every folder—removing only the first one leaves
+   * rule packs behind while reporting success.
+   */
+  const removeInEveryFolder = async (
+    remove: (root: string) => Promise<boolean>
+  ): Promise<boolean> => {
+    let removed = false;
+    for (const root of ensureWorkspaces()) {
+      if (await remove(root)) {
+        removed = true;
+      }
+    }
+    return removed;
+  };
+
   register("aiRules.removeCursorWorkspace", async () => {
-    const root = ensureWorkspace();
+    ensureWorkspaces();
     const confirmed = await confirmDestructive(
       "Remove the Cursor rule pack from `.cursor/rules/ai-rules/`?\n\n" +
         "Unsaved or uncommitted edits in that folder may be lost.",
@@ -653,15 +751,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!confirmed) {
       return;
     }
-    const removed = await removeCursorRules(root);
+    const removed = await removeInEveryFolder(removeCursorRules);
     vscode.window.showInformationMessage(
       `AI Rulebook: ${formatRemovalMessage(removed, "Cursor")}`
     );
-    treeProvider.refresh();
+    await refreshUi();
   });
 
   register("aiRules.removeClineWorkspace", async () => {
-    const root = ensureWorkspace();
+    ensureWorkspaces();
     const confirmed = await confirmDestructive(
       "Remove the Cline rule pack from `.clinerules/ai-rules/`?",
       "Remove Cline rules"
@@ -669,14 +767,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!confirmed) {
       return;
     }
-    const removed = await removeClineRules(root);
+    const removed = await removeInEveryFolder(removeClineRules);
     vscode.window.showInformationMessage(
       `AI Rulebook: ${formatRemovalMessage(removed, "Cline")}`
     );
+    await refreshUi();
   });
 
   register("aiRules.removeOpencodeWorkspace", async () => {
-    const root = ensureWorkspace();
+    ensureWorkspaces();
     const confirmed = await confirmDestructive(
       "Remove the opencode rule pack from `.opencode/rules/ai-rules/`?\n\n" +
         "The opencode config `instructions` entry is not edited automatically.",
@@ -685,15 +784,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!confirmed) {
       return;
     }
-    const removed = await removeOpencodeRules(root);
-    await removeOpencodeCommandFile(root);
+    const removed = await removeInEveryFolder(async (root) => {
+      const dirRemoved = await removeOpencodeRules(root);
+      await removeOpencodeCommandFile(root);
+      return dirRemoved;
+    });
     vscode.window.showInformationMessage(
       `AI Rulebook: ${formatRemovalMessage(removed, "opencode")}`
     );
+    await refreshUi();
   });
 
   register("aiRules.removeClaudeWorkspace", async () => {
-    const root = ensureWorkspace();
+    ensureWorkspaces();
     const confirmed = await confirmDestructive(
       "Remove the Claude Code rule pack from `.claude/rules/ai-rules/`?",
       "Remove Claude Code rules"
@@ -701,14 +804,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!confirmed) {
       return;
     }
-    const removed = await removeClaudeRules(root);
+    const removed = await removeInEveryFolder(removeClaudeRules);
     vscode.window.showInformationMessage(
       `AI Rulebook: ${formatRemovalMessage(removed, "Claude Code")}`
     );
+    await refreshUi();
   });
 
   register("aiRules.removeAllFormatsWorkspace", async () => {
-    const root = ensureWorkspace();
+    const roots = ensureWorkspaces();
     const confirmed = await confirmDestructive(
       "Remove every AI Rulebook rule pack from this workspace?\n\n" +
         "• `.cursor/rules/ai-rules/`\n" +
@@ -721,20 +825,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!confirmed) {
       return;
     }
-    const result = await removeAllRuleFormats(root);
-    await removeOpencodeCommandFile(root);
+    const removed = { cursor: false, cline: false, opencode: false, claude: false };
+    for (const root of roots) {
+      const result = await removeAllRuleFormats(root);
+      await removeOpencodeCommandFile(root);
+      removed.cursor ||= result.cursor;
+      removed.cline ||= result.cline;
+      removed.opencode ||= result.opencode;
+      removed.claude ||= result.claude;
+    }
     const parts = [
-      formatRemovalMessage(result.cursor, "Cursor"),
-      formatRemovalMessage(result.cline, "Cline"),
-      formatRemovalMessage(result.opencode, "opencode"),
-      formatRemovalMessage(result.claude, "Claude Code"),
+      formatRemovalMessage(removed.cursor, "Cursor"),
+      formatRemovalMessage(removed.cline, "Cline"),
+      formatRemovalMessage(removed.opencode, "opencode"),
+      formatRemovalMessage(removed.claude, "Claude Code"),
     ];
     vscode.window.showInformationMessage(`AI Rulebook: ${parts.join(" ")}`);
-    treeProvider.refresh();
+    await refreshUi();
   });
 
   register("aiRules.refreshTree", async () => {
-    treeProvider.refresh();
+    await refreshUi();
   });
 
   context.subscriptions.push(
@@ -795,7 +906,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         (claudeSynced ? " Claude Code: synced to `.claude/rules/ai-rules/`." : "")
     );
     await showRulePackStatusInOutput(rulesOutput, workspaceRulesDir(root), mdcs);
-    treeProvider.refresh();
+    await refreshUi();
   });
 
   await autoInstallIfMissing();
