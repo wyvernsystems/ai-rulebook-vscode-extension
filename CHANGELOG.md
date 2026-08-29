@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-08-29
+
 ### Added
 
 - **Command reference in the README.** Every contributed command is now listed
