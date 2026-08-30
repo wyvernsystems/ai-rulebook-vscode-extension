@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-08-29
+
 ### Added
 
 - **`AGENTS.md` at the repo root.** Records the build/test commands and the
