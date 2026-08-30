@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`AGENTS.md` at the repo root.** Records the build/test commands and the
+  rule-editing workflow (edit `bundled/ai-rules/`, run `npm run
+  sync-bundled`, never edit the generated mirrors as source) for any AI
+  coding agent working on this repo, per the expanded docs rule.
+
+### Changed
+
+- **Expanded `docs.mdc` rule.** The docs rule now covers the wider set of
+  conventional documentation files — `AGENTS.md`, `docs/ARCHITECTURE.md`,
+  `docs/TESTING.md`, and `docs/decisions/` (ADRs) alongside the existing
+  README, CHANGELOG, requirements, and deploy triggers. It states the
+  placement principle (platform-read files at the root, everything else in
+  `docs/`), names the Keep a Changelog format with user-facing entries, and
+  adds creation rules: docs are created by graduating an outgrown README
+  section or on a first-occurrence trigger, never speculatively.
+
 ## [2.10.0] - 2026-08-29
 
 ### Added

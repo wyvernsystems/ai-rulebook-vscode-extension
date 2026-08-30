@@ -54,10 +54,13 @@ turns every rule back on.
   code; add or update unit tests for behavior changes; run the lint and type
   checks the project already has; never weaken a test to make it pass; report
   every failing or unrun check.
-- **`docs.mdc`** — update `README.md`, `docs/REQUIREMENTS.md`,
-  `docs/DEPLOY.md`, and `CHANGELOG.md` only when their trigger applies.
-  Defaults to `README.md` and `CHANGELOG.md` at the repo root with everything
-  else in `docs/`, unless the project already has its own convention.
+- **`docs.mdc`** — update `README.md`, `CHANGELOG.md`, `AGENTS.md`,
+  `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DEPLOY.md`,
+  `docs/TESTING.md`, and `docs/decisions/` only when the file exists and its
+  trigger applies. New docs are created by graduating an outgrown `README.md`
+  section into `docs/`, never speculatively. Defaults to platform-read files
+  at the repo root with everything else in `docs/`, unless the project
+  already has its own convention.
 - **`markdown.mdc`** — one H1, no skipped heading levels, `-` bullets,
   language-tagged code fences, inline code for paths and commands, relative
   links. Scoped to `**/*.{md,mdx}`, so it only loads while editing Markdown.
@@ -245,6 +248,7 @@ regenerate it.
 
 Requirements are tracked in [docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md).
 Cutting a release is documented in [docs/DEPLOY.md](./docs/DEPLOY.md).
+Agent-facing build and workflow facts are in [AGENTS.md](./AGENTS.md).
 
 ## License
 
