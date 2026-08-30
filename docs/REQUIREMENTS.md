@@ -59,7 +59,7 @@ details belong in the code or in the rule files.
   the VSIX. The workspace copy at `.cursor/rules/ai-rules/` is a generated
   install that the extension renders per project, so it is not byte-identical
   to the source. The extension never writes a `.gitignore`: every generated
-  rule folder is left tracked so a team can commit and share it.
+  rule folder is left unignored so a team can commit and share it.
 - `npm run verify:bundled` must pass before packaging. It checks that
   `bundled/manifest.json` lists exactly the rules in `bundled/ai-rules/`, that
   every rule has a `description` in its frontmatter, and that no rule carries

@@ -59,9 +59,9 @@ rule carries a placeholder the extension cannot render. If you added or
 removed a rule file, run `npm run sync-bundled` to regenerate the manifest
 and re-run `npm test`.
 
-Rule text is edited in `bundled/ai-rules/`. The `.cursor/rules/ai-rules/`
-folder is a generated install — committed, but rendered from that source — so
-nothing in the release path reads from it.
+Rule text is edited in `bundled/ai-rules/`. A `.cursor/rules/ai-rules/`
+folder, when present, is a generated install rendered from that source, not
+tracked in this repo — nothing in the release path reads from it.
 
 `npm run sync-bundled` also regenerates `bundled/rule-packs/` — one
 ready-to-copy folder per host (`cursor/`, `cline/`, `opencode/`,

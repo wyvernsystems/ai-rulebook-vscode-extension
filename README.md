@@ -55,12 +55,13 @@ turns every rule back on.
   checks the project already has; never weaken a test to make it pass; report
   every failing or unrun check.
 - **`docs.mdc`** — update `README.md`, `CHANGELOG.md`, `AGENTS.md`,
-  `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DEPLOY.md`,
-  `docs/TESTING.md`, and `docs/decisions/` only when the file exists and its
-  trigger applies. New docs are created by graduating an outgrown `README.md`
-  section into `docs/`, never speculatively. Defaults to platform-read files
-  at the repo root with everything else in `docs/`, unless the project
-  already has its own convention.
+  `CONTRIBUTING.md`, Spec Kit feature specs (`specs/<NNN-feature>/spec.md`),
+  `docs/ARCHITECTURE.md`, `docs/RELEASING.md`, `docs/DEPLOY.md`, and
+  `docs/decisions/` only when the file exists and its trigger applies. New
+  docs are created by graduating an outgrown `README.md` section into
+  `docs/`, never speculatively. Defaults to platform-read files at the repo
+  root with everything else in `docs/`, unless the project already has its
+  own convention.
 - **`markdown.mdc`** — one H1, no skipped heading levels, `-` bullets,
   language-tagged code fences, inline code for paths and commands, relative
   links. Scoped to `**/*.{md,mdx}`, so it only loads while editing Markdown.
@@ -239,16 +240,26 @@ editing a rule file to regenerate `bundled/manifest.json` and the per-tool
 folders under `bundled/rule-packs/` — commit both alongside the rule change.
 
 Source rules hold the `{{TEST_COMMAND}}` token verbatim; the extension
-substitutes the project's real command on the way into a workspace. The
-`.cursor/rules/ai-rules/` folder in this repo is that rendered install — it is
-committed like any other generated rule folder, so it is not byte-identical to
-the source and must not be edited as if it were the source. Change a rule in
-`bundled/ai-rules/`, then re-run the install or **Sync rule pack to Cursor** to
-regenerate it.
+substitutes the project's real command on the way into a workspace. Any
+`.cursor/rules/ai-rules/` folder (or Cline / opencode / Claude Code mirror)
+that appears in this repo is such a rendered install — it is not tracked in
+git and is not byte-identical to the source, so never edit it as if it were
+the source. Change a rule in `bundled/ai-rules/`, then re-run the install or
+a sync command to regenerate it.
 
 Requirements are tracked in [docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md).
 Cutting a release is documented in [docs/DEPLOY.md](./docs/DEPLOY.md).
 Agent-facing build and workflow facts are in [AGENTS.md](./AGENTS.md).
+
+## Limitations
+
+- Rules are instructions, not enforcement. An AI agent can still misread or
+  ignore a rule, and models tend to drop rules under context pressure in long
+  sessions — re-state the rule that matters when that happens.
+- Rules only load in tools that read the installed folder. A tool this
+  extension doesn't mirror to never sees them.
+- The extension manages the rule files themselves; it does not verify that
+  code changes actually followed them.
 
 ## License
 

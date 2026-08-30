@@ -21,15 +21,14 @@ npm run package       # build the VSIX
   `bundled/manifest.json` and `bundled/rule-packs/` alongside.
 - The workspace folders `.cursor/rules/ai-rules/`, `.claude/rules/ai-rules/`,
   `.clinerules/ai-rules/`, and `.opencode/rules/ai-rules/` are generated
-  installs. They are committed, but never edit them as if they were the
-  source — regenerate them from the bundle instead.
+  installs and are not tracked in this repo. Never edit them as if they were
+  the source — regenerate them from the bundle instead.
 - Keep the `{{TEST_COMMAND}}` token verbatim in source rules; the extension
   substitutes the real command at install time.
 
 ## Conventions
 
-- This repo runs on its own rule pack: see `.claude/rules/ai-rules/` (or the
-  mirrors) for the scope, tests-first, docs, Markdown, and Git rules that
-  apply to every change here.
+- This repo follows its own rule pack: the scope, tests-first, docs,
+  Markdown, and Git rules in `bundled/ai-rules/` apply to every change here.
 - Requirements live in [docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md);
   releases are cut per [docs/DEPLOY.md](./docs/DEPLOY.md).
