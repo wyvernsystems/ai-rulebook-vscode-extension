@@ -6,31 +6,45 @@ import test, { describe } from "node:test";
 
 import {
   convertCursorRuleToClaudeRule,
+  convertCursorRuleToCopilotRule,
+  convertCursorRuleToWindsurfRule,
   ensureOpencodeInstructionsEntry,
   installRulePack,
   isRuleEnabled,
   mirrorRuleToClaudeCode,
+  mirrorRuleToCopilot,
   mirrorRuleToOpencode,
+  mirrorRuleToWindsurf,
   OPENCODE_RULES_GLOB,
   pathExists,
   removeAllRuleFormats,
   removeClaudeRules,
   removeClineRules,
+  removeCopilotRules,
   removeCursorRules,
   removeOpencodeRules,
+  removeWindsurfRules,
   resetRulesDirToBundle,
   resolveOpencodeConfigPath,
   setRuleEnabled,
   stripCursorFrontmatter,
   syncBundledMdcsToClaudeRules,
   syncBundledMdcsToClinerules,
+  syncBundledMdcsToCopilotRules,
   syncBundledMdcsToOpencodeRules,
+  syncBundledMdcsToWindsurfRules,
   syncClaudeMirrorFromWorkspace,
+  syncCopilotMirrorFromWorkspace,
   syncOpencodeMirrorFromWorkspace,
+  syncWindsurfMirrorFromWorkspace,
   workspaceClaudeRulesDir,
+  workspaceCopilotRulesDir,
   workspaceRulesDir,
   workspaceUsesClaudeCode,
+  workspaceUsesCopilot,
   workspaceUsesOpencode,
+  workspaceUsesWindsurf,
+  workspaceWindsurfRulesDir,
 } from "../out/rulesOperations.js";
 import {
   TEST_COMMAND_PLACEHOLDER,
@@ -918,6 +932,372 @@ describe("workspaceClaudeRulesDir", () => {
   });
 });
 
+describe("workspaceUsesWindsurf", () => {
+  test("returns false when no Windsurf files exist", async () => {
+    const root = await makeTempRoot("airules-windsurf-none-");
+    try {
+      assert.equal(await workspaceUsesWindsurf(root), false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("recognizes a .windsurf folder and a .windsurfrules file", async () => {
+    const root = await makeTempRoot("airules-windsurf-evidence-");
+    try {
+      await fs.mkdir(path.join(root, ".windsurf"));
+      assert.equal(await workspaceUsesWindsurf(root), true);
+      await fs.rm(path.join(root, ".windsurf"), { recursive: true, force: true });
+
+      await writeFile(path.join(root, ".windsurfrules"), "# rules\n");
+      assert.equal(await workspaceUsesWindsurf(root), true);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("convertCursorRuleToWindsurfRule", () => {
+  test("emits trigger: always_on for a rule with no globs", () => {
+    const body =
+      "---\ndescription: x\nalwaysApply: true\n---\n\n# Code\n\n- Reuse code.\n";
+    assert.equal(
+      convertCursorRuleToWindsurfRule(body),
+      "---\ntrigger: always_on\n---\n\n\n# Code\n\n- Reuse code.\n"
+    );
+  });
+
+  test("converts a globs pattern into trigger: glob frontmatter", () => {
+    const body =
+      '---\ndescription: x\nglobs: "**/*.{md,mdx}"\nalwaysApply: false\n---\n\n# Markdown\n\nBody\n';
+    assert.equal(
+      convertCursorRuleToWindsurfRule(body),
+      '---\ntrigger: glob\nglobs: "**/*.{md,mdx}"\n---\n\n\n# Markdown\n\nBody\n'
+    );
+  });
+
+  test("still emits trigger: always_on for a rule with no frontmatter", () => {
+    assert.equal(
+      convertCursorRuleToWindsurfRule("# Scope\n"),
+      "---\ntrigger: always_on\n---\n\n# Scope\n"
+    );
+  });
+});
+
+describe("syncBundledMdcsToWindsurfRules", () => {
+  test("writes converted topic rules as <topic>.md without touching .gitignore", async () => {
+    const bundle = await makeTempRoot("airules-windsurf-bundle-");
+    await writeFile(
+      path.join(bundle, SAMPLE_RULE),
+      "---\ndescription: x\nalwaysApply: true\n---\n\n# Code\n\n- Reuse code.\n"
+    );
+    const workspace = await makeTempRoot("airules-windsurf-sync-");
+    try {
+      await syncBundledMdcsToWindsurfRules(workspace, bundle, [SAMPLE_RULE], null);
+
+      const mirror = path.join(workspace, ".windsurf", "rules", "ai-rules", "code.md");
+      assert.equal(
+        await fs.readFile(mirror, "utf8"),
+        "---\ntrigger: always_on\n---\n\n\n# Code\n\n- Reuse code.\n"
+      );
+      assert.equal(await pathExists(path.join(workspace, ".gitignore")), false);
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("mirrors disabled Cursor rules as .md.disabled", async () => {
+    const bundle = await makeTempRoot("airules-windsurf-state-bundle-");
+    await writeFile(
+      path.join(bundle, SAMPLE_RULE),
+      "---\ndescription: x\nalwaysApply: true\n---\n\n# Code\n\n- Reuse code.\n"
+    );
+    await writeFile(path.join(bundle, "scope.mdc"), "scope stub\n");
+    const workspace = await makeTempRoot("airules-windsurf-state-ws-");
+    try {
+      const cursorDir = workspaceRulesDir(workspace);
+      await writeFile(path.join(cursorDir, `${SAMPLE_RULE}.disabled`), "off\n");
+      await writeFile(path.join(cursorDir, "scope.mdc"), "on\n");
+      await syncBundledMdcsToWindsurfRules(workspace, bundle, [SAMPLE_RULE, "scope.mdc"], null);
+
+      const dest = path.join(workspace, ".windsurf", "rules", "ai-rules");
+      assert.equal(await pathExists(path.join(dest, "code.md")), false);
+      assert.equal(await pathExists(path.join(dest, "code.md.disabled")), true);
+      assert.equal(await pathExists(path.join(dest, "scope.md")), true);
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Windsurf mirror state", () => {
+  test("mirrorRuleToWindsurf writes active and disabled mirrors from the Cursor file", async () => {
+    const workspace = await makeTempRoot("airules-windsurf-mirror-");
+    try {
+      const cursorDir = workspaceRulesDir(workspace);
+      await writeFile(
+        path.join(cursorDir, SAMPLE_RULE),
+        "---\ndescription: x\nalwaysApply: true\n---\n\nBody\n"
+      );
+      const mirror = path.join(workspace, ".windsurf", "rules", "ai-rules", "code.md");
+
+      await mirrorRuleToWindsurf(workspace, SAMPLE_RULE, true);
+      assert.equal(await pathExists(mirror), true);
+      assert.equal(await pathExists(`${mirror}.disabled`), false);
+
+      await setRuleEnabled(workspaceRulesDir(workspace), SAMPLE_RULE, false);
+      await mirrorRuleToWindsurf(workspace, SAMPLE_RULE, false);
+      assert.equal(await pathExists(mirror), false);
+      assert.equal(await pathExists(`${mirror}.disabled`), true);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("mirrorRuleToWindsurf leaves the mirror untouched when the Cursor source is missing", async () => {
+    const workspace = await makeTempRoot("airules-windsurf-mirror-missing-");
+    try {
+      await mirrorRuleToWindsurf(workspace, SAMPLE_RULE, true);
+      const mirror = path.join(workspace, ".windsurf", "rules", "ai-rules", "code.md");
+      assert.equal(await pathExists(mirror), false);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("syncWindsurfMirrorFromWorkspace is a no-op without Cursor rules", async () => {
+    const workspace = await makeTempRoot("airules-windsurf-mirror-nocursor-");
+    try {
+      await syncWindsurfMirrorFromWorkspace(workspace, [SAMPLE_RULE]);
+      assert.equal(
+        await pathExists(path.join(workspace, ".windsurf", "rules", "ai-rules", "code.md")),
+        false
+      );
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("syncWindsurfMirrorFromWorkspace mirrors every rule state", async () => {
+    const workspace = await makeTempRoot("airules-windsurf-mirror-bulk-");
+    try {
+      const cursorDir = workspaceRulesDir(workspace);
+      await writeFile(path.join(cursorDir, SAMPLE_RULE), "on\n");
+      await writeFile(path.join(cursorDir, "scope.mdc.disabled"), "off\n");
+      await syncWindsurfMirrorFromWorkspace(workspace, [SAMPLE_RULE, "scope.mdc"]);
+
+      const dest = path.join(workspace, ".windsurf", "rules", "ai-rules");
+      assert.equal(await pathExists(path.join(dest, "code.md")), true);
+      assert.equal(await pathExists(path.join(dest, "scope.md")), false);
+      assert.equal(await pathExists(path.join(dest, "scope.md.disabled")), true);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("workspaceWindsurfRulesDir", () => {
+  test("uses the expected suffix", () => {
+    const dir = workspaceWindsurfRulesDir("/tmp/proj");
+    assert.ok(dir.endsWith(path.join(".windsurf", "rules", "ai-rules")));
+  });
+});
+
+describe("workspaceUsesCopilot", () => {
+  test("returns false when no Copilot files exist", async () => {
+    const root = await makeTempRoot("airules-copilot-none-");
+    try {
+      assert.equal(await workspaceUsesCopilot(root), false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("recognizes copilot-instructions.md and a .github/instructions folder", async () => {
+    const root = await makeTempRoot("airules-copilot-evidence-");
+    try {
+      await writeFile(path.join(root, ".github", "copilot-instructions.md"), "# rules\n");
+      assert.equal(await workspaceUsesCopilot(root), true);
+      await fs.rm(path.join(root, ".github", "copilot-instructions.md"));
+
+      await fs.mkdir(path.join(root, ".github", "instructions"), { recursive: true });
+      assert.equal(await workspaceUsesCopilot(root), true);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("convertCursorRuleToCopilotRule", () => {
+  test("emits applyTo: ** for a rule with no globs", () => {
+    const body =
+      "---\ndescription: x\nalwaysApply: true\n---\n\n# Code\n\n- Reuse code.\n";
+    assert.equal(
+      convertCursorRuleToCopilotRule(body),
+      '---\napplyTo: "**"\n---\n\n\n# Code\n\n- Reuse code.\n'
+    );
+  });
+
+  test("converts a globs pattern into applyTo frontmatter", () => {
+    const body =
+      '---\ndescription: x\nglobs: "**/*.{md,mdx}"\nalwaysApply: false\n---\n\n# Markdown\n\nBody\n';
+    assert.equal(
+      convertCursorRuleToCopilotRule(body),
+      '---\napplyTo: "**/*.{md,mdx}"\n---\n\n\n# Markdown\n\nBody\n'
+    );
+  });
+
+  test("still emits applyTo: ** for a rule with no frontmatter", () => {
+    assert.equal(
+      convertCursorRuleToCopilotRule("# Scope\n"),
+      '---\napplyTo: "**"\n---\n\n# Scope\n'
+    );
+  });
+});
+
+describe("syncBundledMdcsToCopilotRules", () => {
+  test("writes converted topic rules as <topic>.instructions.md without touching .gitignore", async () => {
+    const bundle = await makeTempRoot("airules-copilot-bundle-");
+    await writeFile(
+      path.join(bundle, SAMPLE_RULE),
+      "---\ndescription: x\nalwaysApply: true\n---\n\n# Code\n\n- Reuse code.\n"
+    );
+    const workspace = await makeTempRoot("airules-copilot-sync-");
+    try {
+      await syncBundledMdcsToCopilotRules(workspace, bundle, [SAMPLE_RULE], null);
+
+      const mirror = path.join(
+        workspace,
+        ".github",
+        "instructions",
+        "ai-rules",
+        "code.instructions.md"
+      );
+      assert.equal(
+        await fs.readFile(mirror, "utf8"),
+        '---\napplyTo: "**"\n---\n\n\n# Code\n\n- Reuse code.\n'
+      );
+      assert.equal(await pathExists(path.join(workspace, ".gitignore")), false);
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("mirrors disabled Cursor rules as .instructions.md.disabled", async () => {
+    const bundle = await makeTempRoot("airules-copilot-state-bundle-");
+    await writeFile(
+      path.join(bundle, SAMPLE_RULE),
+      "---\ndescription: x\nalwaysApply: true\n---\n\n# Code\n\n- Reuse code.\n"
+    );
+    await writeFile(path.join(bundle, "scope.mdc"), "scope stub\n");
+    const workspace = await makeTempRoot("airules-copilot-state-ws-");
+    try {
+      const cursorDir = workspaceRulesDir(workspace);
+      await writeFile(path.join(cursorDir, `${SAMPLE_RULE}.disabled`), "off\n");
+      await writeFile(path.join(cursorDir, "scope.mdc"), "on\n");
+      await syncBundledMdcsToCopilotRules(workspace, bundle, [SAMPLE_RULE, "scope.mdc"], null);
+
+      const dest = path.join(workspace, ".github", "instructions", "ai-rules");
+      assert.equal(await pathExists(path.join(dest, "code.instructions.md")), false);
+      assert.equal(await pathExists(path.join(dest, "code.instructions.md.disabled")), true);
+      assert.equal(await pathExists(path.join(dest, "scope.instructions.md")), true);
+    } finally {
+      await fs.rm(bundle, { recursive: true, force: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Copilot mirror state", () => {
+  test("mirrorRuleToCopilot writes active and disabled mirrors from the Cursor file", async () => {
+    const workspace = await makeTempRoot("airules-copilot-mirror-");
+    try {
+      const cursorDir = workspaceRulesDir(workspace);
+      await writeFile(
+        path.join(cursorDir, SAMPLE_RULE),
+        "---\ndescription: x\nalwaysApply: true\n---\n\nBody\n"
+      );
+      const mirror = path.join(
+        workspace,
+        ".github",
+        "instructions",
+        "ai-rules",
+        "code.instructions.md"
+      );
+
+      await mirrorRuleToCopilot(workspace, SAMPLE_RULE, true);
+      assert.equal(await pathExists(mirror), true);
+      assert.equal(await pathExists(`${mirror}.disabled`), false);
+
+      await setRuleEnabled(workspaceRulesDir(workspace), SAMPLE_RULE, false);
+      await mirrorRuleToCopilot(workspace, SAMPLE_RULE, false);
+      assert.equal(await pathExists(mirror), false);
+      assert.equal(await pathExists(`${mirror}.disabled`), true);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("mirrorRuleToCopilot leaves the mirror untouched when the Cursor source is missing", async () => {
+    const workspace = await makeTempRoot("airules-copilot-mirror-missing-");
+    try {
+      await mirrorRuleToCopilot(workspace, SAMPLE_RULE, true);
+      const mirror = path.join(
+        workspace,
+        ".github",
+        "instructions",
+        "ai-rules",
+        "code.instructions.md"
+      );
+      assert.equal(await pathExists(mirror), false);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("syncCopilotMirrorFromWorkspace is a no-op without Cursor rules", async () => {
+    const workspace = await makeTempRoot("airules-copilot-mirror-nocursor-");
+    try {
+      await syncCopilotMirrorFromWorkspace(workspace, [SAMPLE_RULE]);
+      assert.equal(
+        await pathExists(
+          path.join(workspace, ".github", "instructions", "ai-rules", "code.instructions.md")
+        ),
+        false
+      );
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("syncCopilotMirrorFromWorkspace mirrors every rule state", async () => {
+    const workspace = await makeTempRoot("airules-copilot-mirror-bulk-");
+    try {
+      const cursorDir = workspaceRulesDir(workspace);
+      await writeFile(path.join(cursorDir, SAMPLE_RULE), "on\n");
+      await writeFile(path.join(cursorDir, "scope.mdc.disabled"), "off\n");
+      await syncCopilotMirrorFromWorkspace(workspace, [SAMPLE_RULE, "scope.mdc"]);
+
+      const dest = path.join(workspace, ".github", "instructions", "ai-rules");
+      assert.equal(await pathExists(path.join(dest, "code.instructions.md")), true);
+      assert.equal(await pathExists(path.join(dest, "scope.instructions.md")), false);
+      assert.equal(await pathExists(path.join(dest, "scope.instructions.md.disabled")), true);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("workspaceCopilotRulesDir", () => {
+  test("uses the expected suffix", () => {
+    const dir = workspaceCopilotRulesDir("/tmp/proj");
+    assert.ok(dir.endsWith(path.join(".github", "instructions", "ai-rules")));
+  });
+});
+
 describe("remove rule format folders", () => {
   test("removeCursorRules deletes only the Cursor rules folder", async () => {
     const workspace = await makeTempRoot("airules-remove-cursor-");
@@ -944,6 +1324,11 @@ describe("remove rule format folders", () => {
       await writeFile(path.join(workspace, ".clinerules", "ai-rules", "ai-rules-code.md"), "cline\n");
       await writeFile(path.join(workspace, ".opencode", "rules", "ai-rules", "code.md"), "open\n");
       await writeFile(path.join(workspace, ".claude", "rules", "ai-rules", "code.md"), "claude\n");
+      await writeFile(path.join(workspace, ".windsurf", "rules", "ai-rules", "code.md"), "windsurf\n");
+      await writeFile(
+        path.join(workspace, ".github", "instructions", "ai-rules", "code.instructions.md"),
+        "copilot\n"
+      );
 
       const result = await removeAllRuleFormats(workspace);
       assert.deepEqual(result, {
@@ -951,11 +1336,18 @@ describe("remove rule format folders", () => {
         cline: true,
         opencode: true,
         claude: true,
+        windsurf: true,
+        copilot: true,
       });
       assert.equal(await pathExists(workspaceRulesDir(workspace)), false);
       assert.equal(await pathExists(path.join(workspace, ".clinerules", "ai-rules")), false);
       assert.equal(await pathExists(path.join(workspace, ".opencode", "rules", "ai-rules")), false);
       assert.equal(await pathExists(path.join(workspace, ".claude", "rules", "ai-rules")), false);
+      assert.equal(await pathExists(path.join(workspace, ".windsurf", "rules", "ai-rules")), false);
+      assert.equal(
+        await pathExists(path.join(workspace, ".github", "instructions", "ai-rules")),
+        false
+      );
     } finally {
       await fs.rm(workspace, { recursive: true, force: true });
     }
@@ -968,11 +1360,15 @@ describe("remove rule format folders", () => {
       assert.equal(await removeClineRules(workspace), false);
       assert.equal(await removeOpencodeRules(workspace), false);
       assert.equal(await removeClaudeRules(workspace), false);
+      assert.equal(await removeWindsurfRules(workspace), false);
+      assert.equal(await removeCopilotRules(workspace), false);
       assert.deepEqual(await removeAllRuleFormats(workspace), {
         cursor: false,
         cline: false,
         opencode: false,
         claude: false,
+        windsurf: false,
+        copilot: false,
       });
     } finally {
       await fs.rm(workspace, { recursive: true, force: true });

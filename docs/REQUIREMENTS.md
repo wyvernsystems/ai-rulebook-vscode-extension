@@ -38,11 +38,13 @@ details belong in the code or in the rule files.
   without reading the description column.
 - The same green / red scheme is applied to rule files in VS Code's built-in
   Explorer: `<name>.mdc` / `<name>.mdc.disabled` under
-  `.cursor/rules/ai-rules/` and `<name>.md` / `<name>.md.disabled` under
-  `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`, or
-  `.claude/rules/ai-rules/` in the open workspace. Files that merely end in
-  `.md` elsewhere are not tinted. Gated by `aiRules.colorRulesInExplorer`
-  (default `true`).
+  `.cursor/rules/ai-rules/` and `<name>.md` / `<name>.md.disabled` (or
+  `<name>.instructions.md` / `<name>.instructions.md.disabled` under
+  `.github/instructions/ai-rules/`) under `.clinerules/ai-rules/`,
+  `.opencode/rules/ai-rules/`, `.claude/rules/ai-rules/`,
+  `.windsurf/rules/ai-rules/`, or `.github/instructions/ai-rules/` in the
+  open workspace. Files that merely end in `.md` elsewhere are not tinted.
+  Gated by `aiRules.colorRulesInExplorer` (default `true`).
 - A status bar item shows the enabled-rule count for the first workspace
   folder (`AI 5/6`) plus the opencode config sync state (`✓` synced, `✗`
   skipped). Clicking it runs `AI Rulebook: Sync rule pack to opencode`. It is
@@ -65,8 +67,9 @@ details belong in the code or in the rule files.
   every rule has a `description` in its frontmatter, and that no rule carries
   a placeholder the extension cannot render.
 - `npm run sync-bundled` regenerates both `bundled/manifest.json` and
-  `bundled/rule-packs/` (`cursor/`, `cline/`, `opencode/`, `claude-code/`),
-  each a ready-to-copy `ai-rules/` folder rendered from `bundled/ai-rules/`
+  `bundled/rule-packs/` (`cursor/`, `cline/`, `opencode/`, `claude-code/`,
+  `windsurf/`, `copilot/`), each a ready-to-copy `ai-rules/` folder rendered
+  from `bundled/ai-rules/`
   using the same conversion rules as the corresponding workspace mirror
   (`{{TEST_COMMAND}}` rendered as generic prose, since there is no project).
   These folders are tracked in git, so someone can browse or grab a tool's
@@ -88,9 +91,10 @@ details belong in the code or in the rule files.
   `saoudrizwan.cline-nightly`) and `aiRules.autoSyncClineWhenInstalled` is
   on, the extension mirrors each topic rule into `.clinerules/ai-rules/` as
   `ai-rules-<topic>.md` after install, reset, manual sync, and first
-  detection. In a multi-root workspace this mirroring, the opencode and
-  Claude Code mirroring, and their manual sync commands (`AI Rulebook: Sync
-  rule pack to Cline` / `...to opencode` / `...to Claude Code`) run
+  detection. In a multi-root workspace this mirroring, the opencode,
+  Claude Code, Windsurf, and Copilot mirroring, and their manual sync
+  commands (`AI Rulebook: Sync rule pack to Cline` / `...to opencode` /
+  `...to Claude Code` / `...to Windsurf` / `...to GitHub Copilot`) run
   independently in every open folder — each folder is judged on its own
   evidence and its own Cursor rule state. Only the `.cursor/rules/ai-rules/`
   install itself (auto-install, `AI Rulebook: Install / update rule pack`,
@@ -141,24 +145,64 @@ details belong in the code or in the rule files.
   config file is registered or edited.
 - The `AI Rulebook: Sync rule pack to Claude Code` command runs the Claude
   Code mirror manually, regardless of the auto-sync gate.
+- Windsurf mirroring (`.windsurf/rules/ai-rules/`) is independent of the
+  Cursor install policy: when the workspace shows evidence of Windsurf usage
+  (a `.windsurf/` folder or a `.windsurfrules` file) and
+  `aiRules.autoSyncWindsurfWhenInstalled` is on, the extension mirrors each
+  topic rule into `.windsurf/rules/ai-rules/` as `<topic>.md` with the Cursor
+  frontmatter converted: a rule's `globs` pattern becomes `trigger: glob`
+  with a matching `globs:` field, and a rule with no `globs` becomes
+  `trigger: always_on`. Windsurf auto-discovers every `.md` file under
+  `.windsurf/rules/`, so no config file is registered or edited.
+- The `AI Rulebook: Sync rule pack to Windsurf` command runs the Windsurf
+  mirror manually, regardless of the auto-sync gate.
+- The Windsurf mirror reflects the workspace's Cursor rule state: enabled
+  rules are written as `<topic>.md`, disabled rules as `<topic>.md.disabled`
+  (Windsurf only auto-loads `.md` files, so disabled mirrors are skipped).
+  Sidebar checkbox toggles and the enable / disable-all commands update the
+  mirror immediately when Windsurf evidence exists and
+  `aiRules.autoSyncWindsurfWhenInstalled` is on. When the workspace has no
+  Cursor rules folder, every Windsurf rule defaults to enabled.
+- GitHub Copilot mirroring (`.github/instructions/ai-rules/`) is independent
+  of the Cursor install policy: when the workspace shows evidence of Copilot
+  custom-instructions usage (a `.github/copilot-instructions.md` file or a
+  `.github/instructions/` folder) and `aiRules.autoSyncCopilotWhenInstalled`
+  is on, the extension mirrors each topic rule into
+  `.github/instructions/ai-rules/` as `<topic>.instructions.md` with the
+  Cursor frontmatter converted: a rule's `globs` pattern becomes an
+  `applyTo:` field with that glob, and a rule with no `globs` becomes
+  `applyTo: "**"` (Copilot requires `applyTo:` on every file). Copilot
+  auto-discovers every `*.instructions.md` file under
+  `.github/instructions/`, so no config file is registered or edited.
+- The `AI Rulebook: Sync rule pack to GitHub Copilot` command runs the
+  Copilot mirror manually, regardless of the auto-sync gate.
+- The Copilot mirror reflects the workspace's Cursor rule state: enabled
+  rules are written as `<topic>.instructions.md`, disabled rules as
+  `<topic>.instructions.md.disabled` (Copilot only auto-loads
+  `*.instructions.md` files, so disabled mirrors are skipped). Sidebar
+  checkbox toggles and the enable / disable-all commands update the mirror
+  immediately when Copilot evidence exists and
+  `aiRules.autoSyncCopilotWhenInstalled` is on. When the workspace has no
+  Cursor rules folder, every Copilot rule defaults to enabled.
 - The `AI Rulebook: Sync rule pack to Cursor` command refreshes
   `.cursor/rules/ai-rules/` from the bundled copy manually, regardless of
   host application or `aiRules.installCursorRulesFolder`.
 - The `AI Rulebook: Sync rule pack to all formats` command writes every
-  supported mirror (Cursor, Cline, opencode, and Claude Code) in one step,
-  ignoring every auto-sync gate. The `.cursor/` install targets the first
-  workspace folder; the three mirrors are written in every open folder, as
-  the per-format sync commands do.
+  supported mirror (Cursor, Cline, opencode, Claude Code, Windsurf, and
+  GitHub Copilot) in one step, ignoring every auto-sync gate. The `.cursor/`
+  install targets the first workspace folder; the five mirrors are written
+  in every open folder, as the per-format sync commands do.
 - Every `Sync rule pack to …` command preserves each rule's on / off state,
   so a disabled rule stays disabled in the format it writes. Only
   `Install / update rule pack` and `Reset rule pack to defaults` converge the
   pack back to the bundled defaults, where every rule is enabled.
 - Remove commands delete `.cursor/rules/ai-rules/`, `.clinerules/ai-rules/`,
-  `.opencode/rules/ai-rules/`, or `.claude/rules/ai-rules/` individually, or
-  all four at once after a confirmation dialog. They clear every open
-  workspace folder, and the confirmation says so when more than one is open.
-  Removing opencode rules does not edit the opencode config `instructions`
-  array.
+  `.opencode/rules/ai-rules/`, `.claude/rules/ai-rules/`,
+  `.windsurf/rules/ai-rules/`, or `.github/instructions/ai-rules/`
+  individually, or all six at once after a confirmation dialog. They clear
+  every open workspace folder, and the confirmation says so when more than
+  one is open. Removing opencode rules does not edit the opencode config
+  `instructions` array.
 - The rule on / off commands and the sidebar checkboxes require
   `.cursor/rules/ai-rules/` to exist, since a toggle is a rename inside that
   folder. When it is missing they report that the rule pack is not installed
@@ -191,8 +235,10 @@ details belong in the code or in the rule files.
   tokens, environment variables, or anything outside its allowed paths.
 - The extension only writes inside two well-known locations:
   - the open workspace, under `.cursor/rules/ai-rules/`, (with Cline)
-    `.clinerules/ai-rules/`, (with opencode) `.opencode/rules/ai-rules/`, and
-    (with Claude Code) `.claude/rules/ai-rules/`;
+    `.clinerules/ai-rules/`, (with opencode) `.opencode/rules/ai-rules/`,
+    (with Claude Code) `.claude/rules/ai-rules/`, (with Windsurf)
+    `.windsurf/rules/ai-rules/`, and (with GitHub Copilot)
+    `.github/instructions/ai-rules/`;
   - the workspace's opencode config file (root `opencode.json` /
     `opencode.jsonc` / `.opencode/opencode.json`), limited to adding the
     generated `instructions` entry;
@@ -206,8 +252,9 @@ details belong in the code or in the rule files.
   any filesystem call.
 - **Destructive operations** require the workspace rules folder to end with
   `.cursor/rules/ai-rules`. Remove commands for other formats require paths
-  ending with `.clinerules/ai-rules`, `.opencode/rules/ai-rules`, or
-  `.claude/rules/ai-rules` respectively.
+  ending with `.clinerules/ai-rules`, `.opencode/rules/ai-rules`,
+  `.claude/rules/ai-rules`, `.windsurf/rules/ai-rules`, or
+  `.github/instructions/ai-rules` respectively.
 - **Recursive copies refuse symlinks.** `fs.cp` calls and the on-disk walker
   must skip symbolic links.
 - **VSIX contents** are limited to compiled JS (`out/**`), the bundled rule

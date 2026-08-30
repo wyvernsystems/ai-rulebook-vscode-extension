@@ -6,6 +6,40 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-08-30
+
+### Added
+
+- **Open VSX publishing support.** Releases can now be published to the
+  [Open VSX](https://open-vsx.org) registry alongside the Visual Studio
+  Marketplace, from the same `.vsix` artifact, reaching editors that default
+  to Open VSX (VSCodium, Windsurf, Gitpod, Eclipse Theia, and other VS Code
+  forks). `ovsx` is a new dev dependency and
+  [docs/RELEASING.md](./docs/RELEASING.md) documents the publish step for
+  both marketplaces. The extension is live on
+  [Open VSX](https://open-vsx.org/extension/WyvernSystemsLLC/ai-rulebook),
+  so Cursor, Windsurf, VSCodium, and other fork users can install it from
+  their Extensions panel.
+- **README distribution and compatibility docs.** New *Get the extension*
+  section describing the three distribution channels (Open VSX, the Visual
+  Studio Marketplace, and GitHub releases), and a *Where it runs, and what
+  it writes rules for* section separating the editors the extension runs in
+  from the tools it generates rules for.
+
+- **Windsurf and GitHub Copilot support.** The rule pack now mirrors to
+  `.windsurf/rules/ai-rules/` and `.github/instructions/ai-rules/`, on the
+  same footing as the existing Cline / opencode / Claude Code mirrors:
+  automatic sync when the workspace shows evidence of that tool (a
+  `.windsurf/` folder or `.windsurfrules` file; a
+  `.github/copilot-instructions.md` file or `.github/instructions/` folder),
+  new `Sync rule pack to Windsurf` / `Sync rule pack to GitHub Copilot` /
+  `Remove Windsurf rule pack` / `Remove GitHub Copilot rule pack` commands,
+  Explorer color-coding, and new `aiRules.autoSyncWindsurfWhenInstalled` /
+  `aiRules.autoSyncCopilotWhenInstalled` settings (both default `true`).
+  Standalone rule packs for both are also available under
+  `bundled/rule-packs/windsurf/` and `bundled/rule-packs/copilot/` for
+  anyone who doesn't want to install the extension.
+
 ## [3.0.0] - 2026-08-29
 
 ### Added

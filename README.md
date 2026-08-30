@@ -2,8 +2,40 @@
 
 AI Rulebook is a VS Code extension that installs a small set of always-on
 engineering rules for AI coding agents into your project. It supports Cursor,
-Cline, opencode, and Claude Code. The six topic rules cover scope, code reuse,
-testing, docs, Markdown, and Git. A sidebar lets you turn each rule on and off.
+Cline, opencode, Claude Code, Windsurf, and GitHub Copilot. The six topic
+rules cover scope, code reuse, testing, docs, Markdown, and Git. A sidebar
+lets you turn each rule on and off.
+
+## Get the extension
+
+The extension is distributed in three places, all carrying the same build:
+
+- [Open VSX](https://open-vsx.org/extension/WyvernSystemsLLC/ai-rulebook) —
+  the registry used by Cursor, Windsurf, VSCodium, code-server /
+  OpenVSCode Server, Eclipse Theia, and most other VS Code forks. In those
+  editors, search for **AI Rulebook** in the Extensions panel.
+- The Visual Studio Marketplace — the registry stock VS Code searches from
+  its Extensions panel.
+- [GitHub releases](https://github.com/wyvernsystems/ai-rulebook-vscode-extension/releases)
+  — every release attaches the `ai-rulebook-X.Y.Z.vsix` for manual installs
+  (`code --install-extension ai-rulebook-X.Y.Z.vsix`, or Extensions panel →
+  `...` → **Install from VSIX...**), plus standalone per-tool rule-pack zips
+  for using the rules without the extension.
+
+## Where it runs, and what it writes rules for
+
+Two different compatibility lists matter, and they are independent:
+
+- **Editors it runs in** — any VS Code-compatible host: VS Code, Cursor,
+  Windsurf, VSCodium, code-server / OpenVSCode Server, Eclipse Theia, and
+  other forks. The sidebar, commands, and automatic sync work the same in
+  all of them.
+- **Tools it writes rules for** — Cursor, Cline, opencode, Claude Code,
+  Windsurf, and GitHub Copilot, each in its native format and location (see
+  the per-tool sections below). The tool does not have to run inside the
+  same editor: Claude Code and opencode are terminal tools, and the
+  generated rule folders can be committed so teammates get them without
+  installing anything.
 
 ## Commands
 
@@ -14,7 +46,7 @@ the **AI Rulebook** category. The sync and remove commands also appear in the
 
 | Command | What it does |
 | --- | --- |
-| **Install / update rule pack** | Writes the bundled rules into `.cursor/rules/ai-rules/`, then mirrors to Cline, opencode, and Claude Code wherever they apply. Every rule is (re-)enabled. |
+| **Install / update rule pack** | Writes the bundled rules into `.cursor/rules/ai-rules/`, then mirrors to Cline, opencode, Claude Code, Windsurf, and GitHub Copilot wherever they apply. Every rule is (re-)enabled. |
 | **Reset rule pack to defaults…** | Replaces the whole `.cursor/rules/ai-rules/` folder with the bundled copy after a confirmation, deleting extra files you added there. |
 | **Enable all rules (workspace)** | Turns every rule on and updates each mirror. |
 | **Disable all rules (workspace)** | Turns every rule off and updates each mirror. |
@@ -24,20 +56,24 @@ the **AI Rulebook** category. The sync and remove commands also appear in the
 | **Sync rule pack to Cline** | Writes `.clinerules/ai-rules/` in every open folder, whether or not Cline is installed. |
 | **Sync rule pack to opencode** | Writes `.opencode/rules/ai-rules/`, registers the glob in the opencode config, and adds the `/ai-rulebook` command — in every open folder. |
 | **Sync rule pack to Claude Code** | Writes `.claude/rules/ai-rules/` in every open folder. |
-| **Sync rule pack to all formats** | Runs all four syncs in one step, keeping each rule's on / off state. |
+| **Sync rule pack to Windsurf** | Writes `.windsurf/rules/ai-rules/` in every open folder. |
+| **Sync rule pack to GitHub Copilot** | Writes `.github/instructions/ai-rules/` in every open folder. |
+| **Sync rule pack to all formats** | Runs all six syncs in one step, keeping each rule's on / off state. |
 | **Remove Cursor rule pack** | Deletes `.cursor/rules/ai-rules/` after a confirmation. |
 | **Remove Cline rule pack** | Deletes `.clinerules/ai-rules/` after a confirmation. |
 | **Remove opencode rule pack** | Deletes `.opencode/rules/ai-rules/` and the `/ai-rulebook` command after a confirmation. The config `instructions` entry is left alone. |
 | **Remove Claude Code rule pack** | Deletes `.claude/rules/ai-rules/` after a confirmation. |
-| **Remove all rule packs** | Deletes all four rule folders after a confirmation. |
+| **Remove Windsurf rule pack** | Deletes `.windsurf/rules/ai-rules/` after a confirmation. |
+| **Remove GitHub Copilot rule pack** | Deletes `.github/instructions/ai-rules/` after a confirmation. |
+| **Remove all rule packs** | Deletes all six rule folders after a confirmation. |
 | **Show rule pack status** | Turns Explorer rule colors back on, focuses the sidebar, and writes the on / off state to the **AI Rulebook** output channel. |
 | **Hide rule colors** | Turns off the green / red tint on rule files in the Explorer. The sidebar keeps its colors. |
 | **Refresh sidebar** | Re-reads rule state from disk and repaints the sidebar and status bar. |
 
-The remove commands and the Cline / opencode / Claude Code syncs apply to
-every open workspace folder. Anything touching `.cursor/rules/ai-rules/` —
-install, reset, sync to Cursor, and the rule toggles — applies to the first
-workspace folder only.
+The remove commands and the Cline / opencode / Claude Code / Windsurf /
+GitHub Copilot syncs apply to every open workspace folder. Anything touching
+`.cursor/rules/ai-rules/` — install, reset, sync to Cursor, and the rule
+toggles — applies to the first workspace folder only.
 
 **Sync vs. install**: the *Sync* commands push what the sidebar currently
 shows, so a rule you turned off stays off in every format. *Install / update*
@@ -81,7 +117,8 @@ conclusive the rule says "the project's test command" instead of guessing.
 
 You don't need the extension to use these rules. [`bundled/rule-packs/`](./bundled/rule-packs)
 in this repo has a ready-to-copy folder per tool — `cursor/`, `cline/`,
-`opencode/`, `claude-code/` — already rendered in that tool's format. Every
+`opencode/`, `claude-code/`, `windsurf/`, `copilot/` — already rendered in
+that tool's format. Every
 [GitHub release](https://github.com/wyvernsystems/ai-rulebook-vscode-extension/releases)
 also attaches them as standalone `ai-rulebook-rules-<tool>-X.Y.Z.zip` files,
 so you can grab just the one you need without cloning the repo. Drop the
@@ -92,10 +129,10 @@ below.
 
 **Install**
 
-1. Build the extension: `npm install && npm test && npm run package`
-   → produces `ai-rulebook-<version>.vsix`.
-2. Extensions panel → `...` → **Install from VSIX...** (or
-   `code --install-extension ai-rulebook-<version>.vsix`).
+Search for **AI Rulebook** in the Extensions panel, or install the VSIX from
+a [GitHub release](https://github.com/wyvernsystems/ai-rulebook-vscode-extension/releases)
+— see [Get the extension](#get-the-extension). To build it yourself:
+`npm install && npm test && npm run package`.
 
 **Use**
 
@@ -107,14 +144,21 @@ below.
    `.opencode/` folder), the rules are mirrored to opencode automatically.
 4. If the project uses Claude Code (`CLAUDE.md`, `CLAUDE.local.md`, or a
    `.claude/` folder), the rules are mirrored to Claude Code automatically.
-5. Toggle rules with the **AI Rulebook** sidebar checkboxes or the
+5. If the project uses Windsurf (a `.windsurf/` folder or a `.windsurfrules`
+   file), the rules are mirrored to Windsurf automatically.
+6. If the project uses GitHub Copilot custom instructions (a
+   `.github/copilot-instructions.md` file or a `.github/instructions/`
+   folder), the rules are mirrored to Copilot automatically.
+7. Toggle rules with the **AI Rulebook** sidebar checkboxes or the
    command-palette commands.
 
 ## Cursor
 
 **Install**
 
-Install the same VSIX in Cursor — it is a VS Code-compatible host.
+Search for **AI Rulebook** in Cursor's Extensions panel (Cursor installs
+extensions from Open VSX), or install the same VSIX — Cursor is a
+VS Code-compatible host.
 
 **Use**
 
@@ -135,7 +179,7 @@ Install the same VSIX in Cursor — it is a VS Code-compatible host.
 1. Install the AI Rulebook extension in VS Code or Cursor:
 
    ```bash
-   code --install-extension ai-rulebook-3.0.0.vsix
+   code --install-extension ai-rulebook-3.1.0.vsix
    ```
 
    or Extensions panel → `...` → **Install from VSIX...**.
@@ -174,7 +218,7 @@ sync: enabled rules stay as `<topic>.md`, disabled rules become
 1. Install the AI Rulebook extension in VS Code or Cursor:
 
    ```bash
-   code --install-extension ai-rulebook-3.0.0.vsix
+   code --install-extension ai-rulebook-3.1.0.vsix
    ```
 
    or Extensions panel → `...` → **Install from VSIX...**.
@@ -201,12 +245,86 @@ sync: enabled rules stay as `<topic>.md`, disabled rules become
 (or its release zip) and copy its `ai-rules/` folder to
 `.claude/rules/ai-rules/` — no config file changes needed.
 
+## Windsurf
+
+**Set up the rules**
+
+1. Install the AI Rulebook extension in VS Code or Cursor:
+
+   ```bash
+   code --install-extension ai-rulebook-3.1.0.vsix
+   ```
+
+   or Extensions panel → `...` → **Install from VSIX...**.
+2. Open your project folder in that editor.
+3. Open the command palette and run
+   **AI Rulebook: Sync rule pack to Windsurf**. This writes the six rules to
+   `.windsurf/rules/ai-rules/` as `code.md`, `docs.md`, `git.md`,
+   `markdown.md`, `scope.md`, and `tests.md`, each with a `trigger:`
+   frontmatter field. Windsurf auto-discovers every `.md` file under
+   `.windsurf/rules/`, so no config file needs editing.
+4. Open the project in Windsurf — the rules load automatically. The
+   `markdown.mdc` rule's Cursor `globs` scoping carries over as
+   `trigger: glob` with a matching `globs:` field, so it only loads while
+   editing Markdown files; the rest use `trigger: always_on`.
+
+If the project already shows evidence of Windsurf usage (a `.windsurf/`
+folder or a `.windsurfrules` file), step 3 happens automatically when you
+open the folder — no manual sync needed.
+
+After setup, toggling rules in the **AI Rulebook** sidebar keeps the mirror in
+sync: enabled rules stay as `<topic>.md`, disabled rules become
+`<topic>.md.disabled` and are skipped.
+
+**Without the extension**: grab [`bundled/rule-packs/windsurf/`](./bundled/rule-packs/windsurf)
+(or its release zip) and copy its `ai-rules/` folder to
+`.windsurf/rules/ai-rules/` — no config file changes needed.
+
+## GitHub Copilot
+
+**Set up the rules**
+
+1. Install the AI Rulebook extension in VS Code or Cursor:
+
+   ```bash
+   code --install-extension ai-rulebook-3.1.0.vsix
+   ```
+
+   or Extensions panel → `...` → **Install from VSIX...**.
+2. Open your project folder in that editor.
+3. Open the command palette and run
+   **AI Rulebook: Sync rule pack to GitHub Copilot**. This writes the six
+   rules to `.github/instructions/ai-rules/` as `code.instructions.md`,
+   `docs.instructions.md`, `git.instructions.md`, `markdown.instructions.md`,
+   `scope.instructions.md`, and `tests.instructions.md`, each with a required
+   `applyTo:` frontmatter field. Copilot auto-discovers every
+   `*.instructions.md` file under `.github/instructions/`, so no config file
+   needs editing.
+4. Open the project with GitHub Copilot — the rules load automatically. The
+   `markdown.mdc` rule's Cursor `globs` scoping carries over as Copilot's
+   `applyTo:` glob, so it only applies while editing Markdown files; the rest
+   use `applyTo: "**"`.
+
+If the project already shows evidence of Copilot custom-instructions usage (a
+`.github/copilot-instructions.md` file or a `.github/instructions/` folder),
+step 3 happens automatically when you open the folder — no manual sync
+needed.
+
+After setup, toggling rules in the **AI Rulebook** sidebar keeps the mirror in
+sync: enabled rules stay as `<topic>.instructions.md`, disabled rules become
+`<topic>.instructions.md.disabled` and are skipped.
+
+**Without the extension**: grab [`bundled/rule-packs/copilot/`](./bundled/rule-packs/copilot)
+(or its release zip) and copy its `ai-rules/` folder to
+`.github/instructions/ai-rules/` — no config file changes needed.
+
 ## Notes
 
 - Generated rule folders (`.cursor/rules/ai-rules/`,
   `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`,
-  `.claude/rules/ai-rules/`) are left unignored so they can be committed and
-  shared with the team.
+  `.claude/rules/ai-rules/`, `.windsurf/rules/ai-rules/`,
+  `.github/instructions/ai-rules/`) are left unignored so they can be
+  committed and shared with the team.
 - With Cline installed, the rules are mirrored to `.clinerules/ai-rules/`
   automatically. Toggling rules in the **AI Rulebook** sidebar keeps that
   mirror in sync too: enabled rules stay as `ai-rules-<topic>.md`, disabled
@@ -221,11 +339,11 @@ sync: enabled rules stay as `<topic>.md`, disabled rules become
 - A status bar item shows the enabled-rule count (`AI 5/6`) and the opencode
   config sync state; click it to run **Sync rule pack to opencode**. It is
   refreshed after every command that writes or deletes rule files.
-- In a multi-root workspace, Cline/opencode/Claude Code mirroring and their
-  manual sync commands run in every open folder that shows evidence for that
-  tool, and the remove commands clear every open folder. The
-  `.cursor/rules/ai-rules/` install itself — and the sidebar rule toggles —
-  apply to the first workspace folder only.
+- In a multi-root workspace, Cline/opencode/Claude Code/Windsurf/Copilot
+  mirroring and their manual sync commands run in every open folder that
+  shows evidence for that tool, and the remove commands clear every open
+  folder. The `.cursor/rules/ai-rules/` install itself — and the sidebar
+  rule toggles — apply to the first workspace folder only.
 - Rule toggles rename files inside `.cursor/rules/ai-rules/`, so they need
   that folder to exist. Without it the sidebar checkboxes and the
   enable / disable commands report that the rule pack is not installed yet.
@@ -245,11 +363,12 @@ folders under `bundled/rule-packs/` — commit both alongside the rule change.
 
 Source rules hold the `{{TEST_COMMAND}}` token verbatim; the extension
 substitutes the project's real command on the way into a workspace. Any
-`.cursor/rules/ai-rules/` folder (or Cline / opencode / Claude Code mirror)
-that appears in this repo is such a rendered install — it is not tracked in
-git and is not byte-identical to the source, so never edit it as if it were
-the source. Change a rule in `bundled/ai-rules/`, then re-run the install or
-a sync command to regenerate it.
+`.cursor/rules/ai-rules/` folder (or Cline / opencode / Claude Code /
+Windsurf / Copilot mirror) that appears in this repo is such a rendered
+install — it is not tracked in git and is not byte-identical to the source,
+so never edit it as if it were the source. Change a rule in
+`bundled/ai-rules/`, then re-run the install or a sync command to regenerate
+it.
 
 Requirements are tracked in [docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md).
 Cutting a release is documented in [docs/RELEASING.md](./docs/RELEASING.md).

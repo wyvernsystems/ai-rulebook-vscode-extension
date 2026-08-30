@@ -6,6 +6,8 @@ const CURSOR_RULES_SEGMENT = `${path.sep}.cursor${path.sep}rules${path.sep}ai-ru
 const CLINE_RULES_SEGMENT = `${path.sep}.clinerules${path.sep}ai-rules${path.sep}`;
 const OPENCODE_RULES_SEGMENT = `${path.sep}.opencode${path.sep}rules${path.sep}ai-rules${path.sep}`;
 const CLAUDE_RULES_SEGMENT = `${path.sep}.claude${path.sep}rules${path.sep}ai-rules${path.sep}`;
+const WINDSURF_RULES_SEGMENT = `${path.sep}.windsurf${path.sep}rules${path.sep}ai-rules${path.sep}`;
+const COPILOT_RULES_SEGMENT = `${path.sep}.github${path.sep}instructions${path.sep}ai-rules${path.sep}`;
 
 const SETTING_ID = "colorRulesInExplorer";
 
@@ -19,8 +21,9 @@ function isEnabled(): boolean {
  * that shows real `file://` URIs) based on whether they live as an active
  * (`<name>.mdc` / `<name>.md`) or disabled (`<name>.mdc.disabled` /
  * `<name>.md.disabled`) rule under any workspace's `.cursor/rules/ai-rules/`,
- * `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`, or
- * `.claude/rules/ai-rules/` folder. Sibling to the sidebar tree's
+ * `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`,
+ * `.claude/rules/ai-rules/`, `.windsurf/rules/ai-rules/`, or
+ * `.github/instructions/ai-rules/` folder. Sibling to the sidebar tree's
  * `RuleStatusDecorationProvider`, which works on synthetic URIs—this one
  * works on the actual files on disk so the same colors show up in the
  * project's file tree.
@@ -40,7 +43,7 @@ export class WorkspaceRuleFileColorer implements vscode.FileDecorationProvider {
 
   private static ownerFor(
     fsPath: string
-  ): "Cursor" | "Cline" | "opencode" | "Claude Code" | undefined {
+  ): "Cursor" | "Cline" | "opencode" | "Claude Code" | "Windsurf" | "GitHub Copilot" | undefined {
     if (fsPath.includes(CURSOR_RULES_SEGMENT)) {
       return "Cursor";
     }
@@ -52,6 +55,12 @@ export class WorkspaceRuleFileColorer implements vscode.FileDecorationProvider {
     }
     if (fsPath.includes(CLAUDE_RULES_SEGMENT)) {
       return "Claude Code";
+    }
+    if (fsPath.includes(WINDSURF_RULES_SEGMENT)) {
+      return "Windsurf";
+    }
+    if (fsPath.includes(COPILOT_RULES_SEGMENT)) {
+      return "GitHub Copilot";
     }
     return undefined;
   }

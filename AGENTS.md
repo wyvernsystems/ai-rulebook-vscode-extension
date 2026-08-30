@@ -1,9 +1,9 @@
 # AGENTS.md
 
 AI Rulebook is a VS Code extension that installs a rule pack for AI coding
-agents into projects, mirrored to Cursor, Cline, opencode, and Claude Code
-formats. TypeScript sources are in `src/`, tests in `tests/*.test.mjs`
-(`node:test`), build scripts in `scripts/`.
+agents into projects, mirrored to Cursor, Cline, opencode, Claude Code,
+Windsurf, and GitHub Copilot formats. TypeScript sources are in `src/`,
+tests in `tests/*.test.mjs` (`node:test`), build scripts in `scripts/`.
 
 ## Commands
 
@@ -20,9 +20,10 @@ npm run package       # build the VSIX
   text. After changing it, run `npm run sync-bundled` and commit
   `bundled/manifest.json` and `bundled/rule-packs/` alongside.
 - The workspace folders `.cursor/rules/ai-rules/`, `.claude/rules/ai-rules/`,
-  `.clinerules/ai-rules/`, and `.opencode/rules/ai-rules/` are generated
-  installs and are not tracked in this repo. Never edit them as if they were
-  the source — regenerate them from the bundle instead.
+  `.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`,
+  `.windsurf/rules/ai-rules/`, and `.github/instructions/ai-rules/` are
+  generated installs and are not tracked in this repo. Never edit them as if
+  they were the source — regenerate them from the bundle instead.
 - Keep the `{{TEST_COMMAND}}` token verbatim in source rules; the extension
   substitutes the real command at install time.
 
@@ -32,3 +33,5 @@ npm run package       # build the VSIX
   Markdown, and Git rules in `bundled/ai-rules/` apply to every change here.
 - Requirements live in [docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md);
   releases are cut per [docs/RELEASING.md](./docs/RELEASING.md).
+- CI (`.github/workflows/ci.yml`) runs `npm test` on every push and pull
+  request against Node 18 and 20; keep it green.

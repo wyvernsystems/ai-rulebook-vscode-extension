@@ -2,6 +2,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { shouldAutoSyncClaude, syncRulePackToClaude } from "./claude";
 import { isClineInstalled, shouldAutoSyncCline } from "./cline";
+import { shouldAutoSyncCopilot, syncRulePackToCopilot } from "./copilot";
 import {
   isCursorHost,
   readCursorInstallPolicy,
@@ -23,24 +24,31 @@ import {
   isRuleEnabled,
   mirrorRuleToClaudeCode,
   mirrorRuleToCline,
+  mirrorRuleToCopilot,
   mirrorRuleToOpencode,
+  mirrorRuleToWindsurf,
   OPENCODE_RULES_GLOB,
   pathExists,
   removeAllRuleFormats,
   removeClaudeRules,
   removeClineRules,
+  removeCopilotRules,
   removeCursorRules,
   removeOpencodeRules,
+  removeWindsurfRules,
   resetRulesDirToBundle,
   setRuleEnabled,
   syncBundledMdcsToClinerules,
   syncClaudeMirrorFromWorkspace,
   syncClineMirrorFromWorkspace,
+  syncCopilotMirrorFromWorkspace,
   syncOpencodeMirrorFromWorkspace,
+  syncWindsurfMirrorFromWorkspace,
   type OpencodeConfigMergeResult,
   type TestCommand,
   workspaceRulesDir,
 } from "./rulesOperations";
+import { shouldAutoSyncWindsurf, syncRulePackToWindsurf } from "./windsurf";
 import { assertContainedPath, isSafeManifestEntry } from "./safePaths";
 import { detectTestCommand } from "./testCommand";
 import { COLOR_RULES_IN_EXPLORER_SETTING, WorkspaceRuleFileColorer } from "./explorerDecorations";
@@ -271,10 +279,37 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     return synced;
   };
 
+  /** Returns true if a Windsurf mirror was written in any workspace folder. */
+  const maybeAutoSyncWindsurf = async (): Promise<boolean> => {
+    let synced = false;
+    for (const root of workspaceRoots()) {
+      if (!(await shouldAutoSyncWindsurf(root))) {
+        continue;
+      }
+      await syncRulePackToWindsurf(root, bundleDir, mdcs, await detectTestCommand(root));
+      synced = true;
+    }
+    return synced;
+  };
+
+  /** Returns true if a GitHub Copilot mirror was written in any workspace folder. */
+  const maybeAutoSyncCopilot = async (): Promise<boolean> => {
+    let synced = false;
+    for (const root of workspaceRoots()) {
+      if (!(await shouldAutoSyncCopilot(root))) {
+        continue;
+      }
+      await syncRulePackToCopilot(root, bundleDir, mdcs, await detectTestCommand(root));
+      synced = true;
+    }
+    return synced;
+  };
+
   /**
    * Reflects a single rule toggle to every available mirror (Cline, opencode,
-   * Claude Code) in every workspace folder that has them enabled. Used by the
-   * sidebar checkbox handler and the enable / disable-one commands.
+   * Claude Code, Windsurf, GitHub Copilot) in every workspace folder that has
+   * them enabled. Used by the sidebar checkbox handler and the enable /
+   * disable-one commands.
    */
   const propagateRuleToggle = async (ruleFile: string, enabled: boolean): Promise<void> => {
     for (const root of workspaceRoots()) {
@@ -286,6 +321,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       if (await shouldAutoSyncClaude(root)) {
         await mirrorRuleToClaudeCode(root, ruleFile, enabled);
+      }
+      if (await shouldAutoSyncWindsurf(root)) {
+        await mirrorRuleToWindsurf(root, ruleFile, enabled);
+      }
+      if (await shouldAutoSyncCopilot(root)) {
+        await mirrorRuleToCopilot(root, ruleFile, enabled);
       }
     }
   };
@@ -301,6 +342,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       if (await shouldAutoSyncClaude(root)) {
         await syncClaudeMirrorFromWorkspace(root, mdcs);
+      }
+      if (await shouldAutoSyncWindsurf(root)) {
+        await syncWindsurfMirrorFromWorkspace(root, mdcs);
+      }
+      if (await shouldAutoSyncCopilot(root)) {
+        await syncCopilotMirrorFromWorkspace(root, mdcs);
       }
     }
   };
@@ -401,7 +448,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const writeCursorRules = shouldAutoInstallCursorRules();
 
     if (!writeCursorRules) {
-      // Cline, opencode, and Claude Code still mirror independently; only skip the .cursor/ install.
+      // Cline, opencode, Claude Code, Windsurf, and Copilot still mirror
+      // independently; only skip the .cursor/ install.
       const parts: string[] = [];
       if (await maybeAutoSyncCline()) {
         parts.push("Cline: synced to `.clinerules/ai-rules/`.");
@@ -411,6 +459,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       if (await maybeAutoSyncClaude()) {
         parts.push("Claude Code: synced to `.claude/rules/ai-rules/`.");
+      }
+      if (await maybeAutoSyncWindsurf()) {
+        parts.push("Windsurf: synced to `.windsurf/rules/ai-rules/`.");
+      }
+      if (await maybeAutoSyncCopilot()) {
+        parts.push("GitHub Copilot: synced to `.github/instructions/ai-rules/`.");
       }
       if (parts.length > 0) {
         vscode.window.showInformationMessage(
@@ -437,6 +491,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     if (await maybeAutoSyncClaude()) {
       parts.push("Claude Code: synced to `.claude/rules/ai-rules/`.");
+    }
+    if (await maybeAutoSyncWindsurf()) {
+      parts.push("Windsurf: synced to `.windsurf/rules/ai-rules/`.");
+    }
+    if (await maybeAutoSyncCopilot()) {
+      parts.push("GitHub Copilot: synced to `.github/instructions/ai-rules/`.");
     }
     vscode.window.showInformationMessage(parts.join(" "));
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
@@ -479,6 +539,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     if (await maybeAutoSyncClaude()) {
       parts.push("Claude Code: synced to `.claude/rules/ai-rules/`.");
+    }
+    if (await maybeAutoSyncWindsurf()) {
+      parts.push("Windsurf: synced to `.windsurf/rules/ai-rules/`.");
+    }
+    if (await maybeAutoSyncCopilot()) {
+      parts.push("GitHub Copilot: synced to `.github/instructions/ai-rules/`.");
     }
     vscode.window.showInformationMessage(parts.join(" "));
     await showRulePackStatusInOutput(rulesOutput, rulesDir, mdcs);
@@ -665,11 +731,41 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await refreshUi();
   });
 
+  register("aiRules.syncWindsurfWorkspace", async () => {
+    const roots = workspaceRoots();
+    if (roots.length === 0) {
+      throw new Error("Open a folder in VS Code first.");
+    }
+    for (const target of roots) {
+      await syncRulePackToWindsurf(target, bundleDir, mdcs, await detectTestCommand(target));
+    }
+    vscode.window.showInformationMessage(
+      "AI Rulebook: wrote the rule pack to `.windsurf/rules/ai-rules/`" +
+        (roots.length > 1 ? ` in ${roots.length} folders.` : ".")
+    );
+    await refreshUi();
+  });
+
+  register("aiRules.syncCopilotWorkspace", async () => {
+    const roots = workspaceRoots();
+    if (roots.length === 0) {
+      throw new Error("Open a folder in VS Code first.");
+    }
+    for (const target of roots) {
+      await syncRulePackToCopilot(target, bundleDir, mdcs, await detectTestCommand(target));
+    }
+    vscode.window.showInformationMessage(
+      "AI Rulebook: wrote the rule pack to `.github/instructions/ai-rules/`" +
+        (roots.length > 1 ? ` in ${roots.length} folders.` : ".")
+    );
+    await refreshUi();
+  });
+
   /**
    * Writes every supported format in one step. The `.cursor/` install applies
    * to the first workspace folder only (the sidebar toggles read that folder),
-   * while the Cline / opencode / Claude Code mirrors are written in every open
-   * folder, matching the per-format sync commands.
+   * while the Cline / opencode / Claude Code / Windsurf / Copilot mirrors are
+   * written in every open folder, matching the per-format sync commands.
    */
   register("aiRules.syncAllFormatsWorkspace", async () => {
     const roots = ensureWorkspaces();
@@ -687,11 +783,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         opencodeSkipped = true;
       }
       await syncRulePackToClaude(target, bundleDir, mdcs, testCommand);
+      await syncRulePackToWindsurf(target, bundleDir, mdcs, testCommand);
+      await syncRulePackToCopilot(target, bundleDir, mdcs, testCommand);
     }
 
     vscode.window.showInformationMessage(
       "AI Rulebook: synced the rule pack to `.cursor/rules/ai-rules/`, " +
-        "`.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`, and `.claude/rules/ai-rules/`" +
+        "`.clinerules/ai-rules/`, `.opencode/rules/ai-rules/`, `.claude/rules/ai-rules/`, " +
+        "`.windsurf/rules/ai-rules/`, and `.github/instructions/ai-rules/`" +
         (roots.length > 1
           ? ` (Cursor in the first folder, the mirrors in all ${roots.length}).`
           : ".")
@@ -811,6 +910,38 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await refreshUi();
   });
 
+  register("aiRules.removeWindsurfWorkspace", async () => {
+    ensureWorkspaces();
+    const confirmed = await confirmDestructive(
+      "Remove the Windsurf rule pack from `.windsurf/rules/ai-rules/`?",
+      "Remove Windsurf rules"
+    );
+    if (!confirmed) {
+      return;
+    }
+    const removed = await removeInEveryFolder(removeWindsurfRules);
+    vscode.window.showInformationMessage(
+      `AI Rulebook: ${formatRemovalMessage(removed, "Windsurf")}`
+    );
+    await refreshUi();
+  });
+
+  register("aiRules.removeCopilotWorkspace", async () => {
+    ensureWorkspaces();
+    const confirmed = await confirmDestructive(
+      "Remove the GitHub Copilot rule pack from `.github/instructions/ai-rules/`?",
+      "Remove GitHub Copilot rules"
+    );
+    if (!confirmed) {
+      return;
+    }
+    const removed = await removeInEveryFolder(removeCopilotRules);
+    vscode.window.showInformationMessage(
+      `AI Rulebook: ${formatRemovalMessage(removed, "GitHub Copilot")}`
+    );
+    await refreshUi();
+  });
+
   register("aiRules.removeAllFormatsWorkspace", async () => {
     const roots = ensureWorkspaces();
     const confirmed = await confirmDestructive(
@@ -818,14 +949,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         "• `.cursor/rules/ai-rules/`\n" +
         "• `.clinerules/ai-rules/`\n" +
         "• `.opencode/rules/ai-rules/`\n" +
-        "• `.claude/rules/ai-rules/`\n\n" +
+        "• `.claude/rules/ai-rules/`\n" +
+        "• `.windsurf/rules/ai-rules/`\n" +
+        "• `.github/instructions/ai-rules/`\n\n" +
         "Unsaved or uncommitted edits may be lost.",
       "Remove all rule packs"
     );
     if (!confirmed) {
       return;
     }
-    const removed = { cursor: false, cline: false, opencode: false, claude: false };
+    const removed = {
+      cursor: false,
+      cline: false,
+      opencode: false,
+      claude: false,
+      windsurf: false,
+      copilot: false,
+    };
     for (const root of roots) {
       const result = await removeAllRuleFormats(root);
       await removeOpencodeCommandFile(root);
@@ -833,12 +973,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       removed.cline ||= result.cline;
       removed.opencode ||= result.opencode;
       removed.claude ||= result.claude;
+      removed.windsurf ||= result.windsurf;
+      removed.copilot ||= result.copilot;
     }
     const parts = [
       formatRemovalMessage(removed.cursor, "Cursor"),
       formatRemovalMessage(removed.cline, "Cline"),
       formatRemovalMessage(removed.opencode, "opencode"),
       formatRemovalMessage(removed.claude, "Claude Code"),
+      formatRemovalMessage(removed.windsurf, "Windsurf"),
+      formatRemovalMessage(removed.copilot, "GitHub Copilot"),
     ];
     vscode.window.showInformationMessage(`AI Rulebook: ${parts.join(" ")}`);
     await refreshUi();
@@ -899,11 +1043,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const clineSynced = await maybeAutoSyncCline();
     const opencodeSynced = await maybeAutoSyncOpencode();
     const claudeSynced = await maybeAutoSyncClaude();
+    const windsurfSynced = await maybeAutoSyncWindsurf();
+    const copilotSynced = await maybeAutoSyncCopilot();
     vscode.window.showInformationMessage(
       "AI Rulebook: workspace rules folder reset to defaults." +
         (clineSynced ? " Cline: synced to `.clinerules/ai-rules/`." : "") +
         (opencodeSynced ? " opencode: synced to `.opencode/rules/ai-rules/`." : "") +
-        (claudeSynced ? " Claude Code: synced to `.claude/rules/ai-rules/`." : "")
+        (claudeSynced ? " Claude Code: synced to `.claude/rules/ai-rules/`." : "") +
+        (windsurfSynced ? " Windsurf: synced to `.windsurf/rules/ai-rules/`." : "") +
+        (copilotSynced ? " GitHub Copilot: synced to `.github/instructions/ai-rules/`." : "")
     );
     await showRulePackStatusInOutput(rulesOutput, workspaceRulesDir(root), mdcs);
     await refreshUi();

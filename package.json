@@ -1,8 +1,8 @@
 {
   "name": "ai-rulebook",
   "displayName": "AI Rulebook",
-  "description": "AI Rulebook — install and manage focused, always-on engineering rules for Cursor, with optional Cline, opencode, and Claude Code sync.",
-  "version": "3.0.0",
+  "description": "AI Rulebook — install and manage focused, always-on engineering rules for Cursor, with optional Cline, opencode, Claude Code, Windsurf, and GitHub Copilot sync.",
+  "version": "3.1.0",
   "publisher": "WyvernSystemsLLC",
   "license": "MIT",
   "icon": "icon.png",
@@ -25,6 +25,8 @@
     "cline",
     "opencode",
     "claude-code",
+    "windsurf",
+    "github-copilot",
     "prompt-engineering",
     "code-assistant"
   ],
@@ -88,6 +90,16 @@
         "category": "AI Rulebook"
       },
       {
+        "command": "aiRules.syncWindsurfWorkspace",
+        "title": "AI Rulebook: Sync rule pack to Windsurf",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.syncCopilotWorkspace",
+        "title": "AI Rulebook: Sync rule pack to GitHub Copilot",
+        "category": "AI Rulebook"
+      },
+      {
         "command": "aiRules.syncAllFormatsWorkspace",
         "title": "AI Rulebook: Sync rule pack to all formats",
         "category": "AI Rulebook"
@@ -110,6 +122,16 @@
       {
         "command": "aiRules.removeClaudeWorkspace",
         "title": "AI Rulebook: Remove Claude Code rule pack",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.removeWindsurfWorkspace",
+        "title": "AI Rulebook: Remove Windsurf rule pack",
+        "category": "AI Rulebook"
+      },
+      {
+        "command": "aiRules.removeCopilotWorkspace",
+        "title": "AI Rulebook: Remove GitHub Copilot rule pack",
         "category": "AI Rulebook"
       },
       {
@@ -247,6 +269,14 @@
         {
           "command": "aiRules.syncClaudeWorkspace",
           "group": "2_format@4"
+        },
+        {
+          "command": "aiRules.syncWindsurfWorkspace",
+          "group": "2_format@5"
+        },
+        {
+          "command": "aiRules.syncCopilotWorkspace",
+          "group": "2_format@6"
         }
       ],
       "aiRules.removeSubmenu": [
@@ -269,6 +299,14 @@
         {
           "command": "aiRules.removeClaudeWorkspace",
           "group": "2_format@4"
+        },
+        {
+          "command": "aiRules.removeWindsurfWorkspace",
+          "group": "2_format@5"
+        },
+        {
+          "command": "aiRules.removeCopilotWorkspace",
+          "group": "2_format@6"
         }
       ]
     },
@@ -346,6 +384,16 @@
           "type": "boolean",
           "default": true,
           "description": "When the workspace shows evidence of Claude Code usage (a CLAUDE.md, a CLAUDE.local.md, or a .claude/ folder), automatically mirror the rule pack into .claude/rules/ai-rules/ after install or reset. Claude Code auto-discovers every .md file under .claude/rules/, so no config file is touched."
+        },
+        "aiRules.autoSyncWindsurfWhenInstalled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When the workspace shows evidence of Windsurf usage (a .windsurf/ folder or a .windsurfrules file), automatically mirror the rule pack into .windsurf/rules/ai-rules/ after install or reset. Windsurf auto-discovers every .md file under .windsurf/rules/, so no config file is touched."
+        },
+        "aiRules.autoSyncCopilotWhenInstalled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When the workspace shows evidence of GitHub Copilot custom-instructions usage (a .github/copilot-instructions.md file or a .github/instructions/ folder), automatically mirror the rule pack into .github/instructions/ai-rules/ after install or reset. Copilot auto-discovers every *.instructions.md file under .github/instructions/, so no config file is touched."
         }
       }
     }
@@ -366,6 +414,7 @@
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.2.0",
+    "ovsx": "^1.1.1",
     "typescript": "^5.4.0"
   }
 }

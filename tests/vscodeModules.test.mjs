@@ -27,6 +27,8 @@ Module._load = function loadWithVscodeMock(request, parent, isMain) {
 const cursor = await import("../out/cursor.js");
 const cline = await import("../out/cline.js");
 const claude = await import("../out/claude.js");
+const windsurf = await import("../out/windsurf.js");
+const copilot = await import("../out/copilot.js");
 const explorerDecorations = await import("../out/explorerDecorations.js");
 const opencode = await import("../out/opencode.js");
 const ruleStatusUi = await import("../out/ruleStatusUi.js");
@@ -389,6 +391,114 @@ describe("Claude Code detection and sync", () => {
   });
 });
 
+describe("Windsurf detection and sync", () => {
+  const bundleDir = path.join(repoRoot, "bundled", "ai-rules");
+
+  test("shouldAutoSyncWindsurf honors the setting and workspace evidence", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+    assert.equal(await windsurf.shouldAutoSyncWindsurf(root), false);
+
+    await fs.mkdir(path.join(root, ".windsurf"));
+    assert.equal(await windsurf.shouldAutoSyncWindsurf(root), true);
+
+    state.configuration.set("aiRules.autoSyncWindsurfWhenInstalled", false);
+    assert.equal(await windsurf.shouldAutoSyncWindsurf(root), false);
+  });
+
+  test("syncRulePackToWindsurf writes converted rules with no config file", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+    await windsurf.syncRulePackToWindsurf(root, bundleDir, RULE_FILES);
+
+    const mirror = path.join(root, ".windsurf", "rules", "ai-rules", "code.md");
+    const body = await fs.readFile(mirror, "utf8");
+    assert.ok(body.length > 0);
+    assert.ok(body.startsWith("---\ntrigger:"));
+    assert.equal(await rulesOperations.pathExists(path.join(root, ".gitignore")), false);
+  });
+
+  test("activate mirrors to Windsurf on a non-Cursor host with workspace evidence", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    await fs.mkdir(path.join(workspaceRoot, ".windsurf"));
+    const { context } = makeExtensionContext(repoRoot);
+
+    await extension.activate(context);
+
+    assert.equal(
+      await rulesOperations.pathExists(rulesOperations.workspaceRulesDir(workspaceRoot)),
+      false
+    );
+    assert.equal(
+      await rulesOperations.pathExists(
+        path.join(workspaceRoot, ".windsurf", "rules", "ai-rules", "code.md")
+      ),
+      true
+    );
+  });
+});
+
+describe("GitHub Copilot detection and sync", () => {
+  const bundleDir = path.join(repoRoot, "bundled", "ai-rules");
+
+  test("shouldAutoSyncCopilot honors the setting and workspace evidence", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+    assert.equal(await copilot.shouldAutoSyncCopilot(root), false);
+
+    await writeFile(path.join(root, ".github", "copilot-instructions.md"), "# rules\n");
+    assert.equal(await copilot.shouldAutoSyncCopilot(root), true);
+
+    state.configuration.set("aiRules.autoSyncCopilotWhenInstalled", false);
+    assert.equal(await copilot.shouldAutoSyncCopilot(root), false);
+  });
+
+  test("syncRulePackToCopilot writes converted rules with no config file", async (t) => {
+    const root = await makeTempWorkspace();
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+    await copilot.syncRulePackToCopilot(root, bundleDir, RULE_FILES);
+
+    const mirror = path.join(root, ".github", "instructions", "ai-rules", "code.instructions.md");
+    const body = await fs.readFile(mirror, "utf8");
+    assert.ok(body.length > 0);
+    assert.ok(body.startsWith("---\napplyTo:"));
+    assert.equal(await rulesOperations.pathExists(path.join(root, ".gitignore")), false);
+  });
+
+  test("activate mirrors to GitHub Copilot on a non-Cursor host with workspace evidence", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    await writeFile(path.join(workspaceRoot, ".github", "copilot-instructions.md"), "# rules\n");
+    const { context } = makeExtensionContext(repoRoot);
+
+    await extension.activate(context);
+
+    assert.equal(
+      await rulesOperations.pathExists(rulesOperations.workspaceRulesDir(workspaceRoot)),
+      false
+    );
+    assert.equal(
+      await rulesOperations.pathExists(
+        path.join(
+          workspaceRoot,
+          ".github",
+          "instructions",
+          "ai-rules",
+          "code.instructions.md"
+        )
+      ),
+      true
+    );
+  });
+});
+
 describe("WorkspaceRuleFileColorer", () => {
   test("provideFileDecoration returns active styling for a workspace .mdc rule", () => {
     state.workspaceFolderResolver = () => ({ name: "workspace" });
@@ -503,6 +613,48 @@ describe("WorkspaceRuleFileColorer", () => {
     assert.match(active.tooltip, /loaded by Claude Code/);
     assert.equal(disabled.color.id, "aiRulebook.inactiveForeground");
     assert.match(disabled.tooltip, /not loaded by Claude Code/);
+  });
+
+  test("provideFileDecoration styles Windsurf rule mirrors", () => {
+    state.workspaceFolderResolver = () => ({ name: "workspace" });
+    const colorer = new explorerDecorations.WorkspaceRuleFileColorer();
+    const active = colorer.provideFileDecoration(
+      Uri.file(path.join("/workspace", ".windsurf", "rules", "ai-rules", "code.md"))
+    );
+    const disabled = colorer.provideFileDecoration(
+      Uri.file(path.join("/workspace", ".windsurf", "rules", "ai-rules", "code.md.disabled"))
+    );
+
+    assert.equal(active.color.id, "aiRulebook.activeForeground");
+    assert.match(active.tooltip, /loaded by Windsurf/);
+    assert.equal(disabled.color.id, "aiRulebook.inactiveForeground");
+    assert.match(disabled.tooltip, /not loaded by Windsurf/);
+  });
+
+  test("provideFileDecoration styles GitHub Copilot rule mirrors", () => {
+    state.workspaceFolderResolver = () => ({ name: "workspace" });
+    const colorer = new explorerDecorations.WorkspaceRuleFileColorer();
+    const active = colorer.provideFileDecoration(
+      Uri.file(
+        path.join("/workspace", ".github", "instructions", "ai-rules", "code.instructions.md")
+      )
+    );
+    const disabled = colorer.provideFileDecoration(
+      Uri.file(
+        path.join(
+          "/workspace",
+          ".github",
+          "instructions",
+          "ai-rules",
+          "code.instructions.md.disabled"
+        )
+      )
+    );
+
+    assert.equal(active.color.id, "aiRulebook.activeForeground");
+    assert.match(active.tooltip, /loaded by GitHub Copilot/);
+    assert.equal(disabled.color.id, "aiRulebook.inactiveForeground");
+    assert.match(disabled.tooltip, /not loaded by GitHub Copilot/);
   });
 
   test("provideFileDecoration leaves non-rule .md files outside opencode rules alone", () => {
@@ -1048,7 +1200,7 @@ describe("extension activation", () => {
     assert.equal(await rulesOperations.isRuleEnabled(rulesDir, SAMPLE_RULE), true);
   });
 
-  test("individual rule commands mirror the toggle to Cline, opencode, and Claude Code", async (t) => {
+  test("individual rule commands mirror the toggle to Cline, opencode, Claude Code, Windsurf, and Copilot", async (t) => {
     const workspaceRoot = await makeTempWorkspace();
     t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
     workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
@@ -1056,6 +1208,8 @@ describe("extension activation", () => {
     state.installedExtensions.add("saoudrizwan.claude-dev");
     await writeFile(path.join(workspaceRoot, "AGENTS.md"), "# rules\n");
     await writeFile(path.join(workspaceRoot, "CLAUDE.md"), "# rules\n");
+    await fs.mkdir(path.join(workspaceRoot, ".windsurf"));
+    await writeFile(path.join(workspaceRoot, ".github", "copilot-instructions.md"), "# rules\n");
     const rulesDir = rulesOperations.workspaceRulesDir(workspaceRoot);
     await Promise.all(
       RULE_FILES.map((ruleFile) => writeFile(path.join(rulesDir, ruleFile)))
@@ -1069,18 +1223,32 @@ describe("extension activation", () => {
     const clineMirror = path.join(workspaceRoot, ".clinerules", "ai-rules", "ai-rules-code.md");
     const opencodeMirror = path.join(workspaceRoot, ".opencode", "rules", "ai-rules", "code.md");
     const claudeMirror = path.join(workspaceRoot, ".claude", "rules", "ai-rules", "code.md");
+    const windsurfMirror = path.join(workspaceRoot, ".windsurf", "rules", "ai-rules", "code.md");
+    const copilotMirror = path.join(
+      workspaceRoot,
+      ".github",
+      "instructions",
+      "ai-rules",
+      "code.instructions.md"
+    );
     assert.equal(await rulesOperations.pathExists(clineMirror), false);
     assert.equal(await rulesOperations.pathExists(`${clineMirror}.disabled`), true);
     assert.equal(await rulesOperations.pathExists(opencodeMirror), false);
     assert.equal(await rulesOperations.pathExists(`${opencodeMirror}.disabled`), true);
     assert.equal(await rulesOperations.pathExists(claudeMirror), false);
     assert.equal(await rulesOperations.pathExists(`${claudeMirror}.disabled`), true);
+    assert.equal(await rulesOperations.pathExists(windsurfMirror), false);
+    assert.equal(await rulesOperations.pathExists(`${windsurfMirror}.disabled`), true);
+    assert.equal(await rulesOperations.pathExists(copilotMirror), false);
+    assert.equal(await rulesOperations.pathExists(`${copilotMirror}.disabled`), true);
 
     await state.registeredCommands.get("aiRules.enableRuleWorkspace")();
 
     assert.equal(await rulesOperations.pathExists(clineMirror), true);
     assert.equal(await rulesOperations.pathExists(opencodeMirror), true);
     assert.equal(await rulesOperations.pathExists(claudeMirror), true);
+    assert.equal(await rulesOperations.pathExists(windsurfMirror), true);
+    assert.equal(await rulesOperations.pathExists(copilotMirror), true);
   });
 
   test("toggling a rule in one workspace folder does not touch another folder's mirror state", async (t) => {
@@ -1169,6 +1337,58 @@ describe("extension activation", () => {
     const dest = path.join(workspaceRoot, ".claude", "rules", "ai-rules");
     for (const ruleFile of RULE_FILES) {
       const mirrorName = ruleFile.replace(".mdc", ".md");
+      assert.equal(await rulesOperations.pathExists(path.join(dest, mirrorName)), false);
+      assert.equal(
+        await rulesOperations.pathExists(path.join(dest, `${mirrorName}.disabled`)),
+        true
+      );
+    }
+  });
+
+  test("bulk disable mirrors every rule off in the Windsurf folder", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    await fs.mkdir(path.join(workspaceRoot, ".windsurf"));
+    const rulesDir = rulesOperations.workspaceRulesDir(workspaceRoot);
+    await Promise.all(
+      RULE_FILES.map((ruleFile) => writeFile(path.join(rulesDir, ruleFile)))
+    );
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+
+    await state.registeredCommands.get("aiRules.disableCoreWorkspace")();
+
+    const dest = path.join(workspaceRoot, ".windsurf", "rules", "ai-rules");
+    for (const ruleFile of RULE_FILES) {
+      const mirrorName = ruleFile.replace(".mdc", ".md");
+      assert.equal(await rulesOperations.pathExists(path.join(dest, mirrorName)), false);
+      assert.equal(
+        await rulesOperations.pathExists(path.join(dest, `${mirrorName}.disabled`)),
+        true
+      );
+    }
+  });
+
+  test("bulk disable mirrors every rule off in the GitHub Copilot folder", async (t) => {
+    const workspaceRoot = await makeTempWorkspace();
+    t.after(() => fs.rm(workspaceRoot, { recursive: true, force: true }));
+    workspace.workspaceFolders = [{ uri: Uri.file(workspaceRoot) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    await writeFile(path.join(workspaceRoot, ".github", "copilot-instructions.md"), "# rules\n");
+    const rulesDir = rulesOperations.workspaceRulesDir(workspaceRoot);
+    await Promise.all(
+      RULE_FILES.map((ruleFile) => writeFile(path.join(rulesDir, ruleFile)))
+    );
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+
+    await state.registeredCommands.get("aiRules.disableCoreWorkspace")();
+
+    const dest = path.join(workspaceRoot, ".github", "instructions", "ai-rules");
+    for (const ruleFile of RULE_FILES) {
+      const mirrorName = ruleFile.replace(".mdc", ".instructions.md");
       assert.equal(await rulesOperations.pathExists(path.join(dest, mirrorName)), false);
       assert.equal(
         await rulesOperations.pathExists(path.join(dest, `${mirrorName}.disabled`)),
@@ -1273,6 +1493,50 @@ describe("manual sync commands", () => {
     );
   });
 
+  test("syncWindsurfWorkspace writes converted rules into every workspace folder", async (t) => {
+    const rootA = await makeTempWorkspace();
+    const rootB = await makeTempWorkspace();
+    t.after(() => {
+      fs.rm(rootA, { recursive: true, force: true });
+      fs.rm(rootB, { recursive: true, force: true });
+    });
+    await activateWithInstalledPack(t, [rootA, rootB]);
+
+    await state.registeredCommands.get("aiRules.syncWindsurfWorkspace")();
+
+    for (const root of [rootA, rootB]) {
+      assert.equal(
+        await rulesOperations.pathExists(
+          path.join(root, ".windsurf", "rules", "ai-rules", "code.md")
+        ),
+        true,
+        `expected ${root} to get the Windsurf mirror`
+      );
+    }
+  });
+
+  test("syncCopilotWorkspace writes converted rules into every workspace folder", async (t) => {
+    const rootA = await makeTempWorkspace();
+    const rootB = await makeTempWorkspace();
+    t.after(() => {
+      fs.rm(rootA, { recursive: true, force: true });
+      fs.rm(rootB, { recursive: true, force: true });
+    });
+    await activateWithInstalledPack(t, [rootA, rootB]);
+
+    await state.registeredCommands.get("aiRules.syncCopilotWorkspace")();
+
+    for (const root of [rootA, rootB]) {
+      assert.equal(
+        await rulesOperations.pathExists(
+          path.join(root, ".github", "instructions", "ai-rules", "code.instructions.md")
+        ),
+        true,
+        `expected ${root} to get the GitHub Copilot mirror`
+      );
+    }
+  });
+
   test("syncAllFormatsWorkspace keeps a disabled rule disabled in every mirror", async (t) => {
     const root = await makeTempWorkspace();
     t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -1287,6 +1551,8 @@ describe("manual sync commands", () => {
       path.join(root, ".clinerules", "ai-rules", "ai-rules-git.md"),
       path.join(root, ".opencode", "rules", "ai-rules", "git.md"),
       path.join(root, ".claude", "rules", "ai-rules", "git.md"),
+      path.join(root, ".windsurf", "rules", "ai-rules", "git.md"),
+      path.join(root, ".github", "instructions", "ai-rules", "git.instructions.md"),
     ];
     for (const mirror of disabledMirrors) {
       assert.equal(await rulesOperations.pathExists(mirror), false, `${mirror} should be off`);
@@ -1330,6 +1596,18 @@ describe("manual sync commands", () => {
         await rulesOperations.pathExists(path.join(root, ".claude", "rules", "ai-rules", "code.md")),
         true,
         `expected ${root} to get the Claude Code mirror`
+      );
+      assert.equal(
+        await rulesOperations.pathExists(path.join(root, ".windsurf", "rules", "ai-rules", "code.md")),
+        true,
+        `expected ${root} to get the Windsurf mirror`
+      );
+      assert.equal(
+        await rulesOperations.pathExists(
+          path.join(root, ".github", "instructions", "ai-rules", "code.instructions.md")
+        ),
+        true,
+        `expected ${root} to get the GitHub Copilot mirror`
       );
     }
   });
@@ -1387,6 +1665,8 @@ describe("remove commands", () => {
       await rulesOperations.syncBundledMdcsToClinerules(root, bundleDir, RULE_FILES, null);
       await rulesOperations.syncBundledMdcsToOpencodeRules(root, bundleDir, RULE_FILES, null);
       await rulesOperations.syncBundledMdcsToClaudeRules(root, bundleDir, RULE_FILES, null);
+      await rulesOperations.syncBundledMdcsToWindsurfRules(root, bundleDir, RULE_FILES, null);
+      await rulesOperations.syncBundledMdcsToCopilotRules(root, bundleDir, RULE_FILES, null);
     }
     const { context } = makeExtensionContext(repoRoot);
     await extension.activate(context);
@@ -1417,6 +1697,8 @@ describe("remove commands", () => {
         rulesOperations.workspaceClineRulesDir(root),
         rulesOperations.workspaceOpencodeRulesDir(root),
         rulesOperations.workspaceClaudeRulesDir(root),
+        rulesOperations.workspaceWindsurfRulesDir(root),
+        rulesOperations.workspaceCopilotRulesDir(root),
       ]) {
         assert.equal(await rulesOperations.pathExists(dir), false, `${dir} should be gone`);
       }
@@ -1440,6 +1722,36 @@ describe("remove commands", () => {
         await rulesOperations.pathExists(rulesOperations.workspaceClineRulesDir(root)),
         false,
         `expected ${root} Cline rules to be removed`
+      );
+    }
+  });
+
+  test("removeWindsurfWorkspace clears every workspace folder", async (t) => {
+    const roots = await activateTwoFolders(t);
+    state.warningChoice = "Remove Windsurf rules";
+
+    await state.registeredCommands.get("aiRules.removeWindsurfWorkspace")();
+
+    for (const root of roots) {
+      assert.equal(
+        await rulesOperations.pathExists(rulesOperations.workspaceWindsurfRulesDir(root)),
+        false,
+        `expected ${root} Windsurf rules to be removed`
+      );
+    }
+  });
+
+  test("removeCopilotWorkspace clears every workspace folder", async (t) => {
+    const roots = await activateTwoFolders(t);
+    state.warningChoice = "Remove GitHub Copilot rules";
+
+    await state.registeredCommands.get("aiRules.removeCopilotWorkspace")();
+
+    for (const root of roots) {
+      assert.equal(
+        await rulesOperations.pathExists(rulesOperations.workspaceCopilotRulesDir(root)),
+        false,
+        `expected ${root} GitHub Copilot rules to be removed`
       );
     }
   });

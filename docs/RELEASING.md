@@ -1,8 +1,10 @@
 # Releasing AI Rulebook
 
 AI Rulebook ships as a `.vsix` extension package built locally and attached to
-a GitHub release. There is no CI pipeline and no deploy server: a release is a
-version bump, a tag, and an uploaded artifact. This document is the checklist.
+a GitHub release. CI (`.github/workflows/ci.yml`) runs `npm test` on every
+push and pull request, but releases are still cut locally — there is no deploy
+server: a release is a version bump, a tag, and an uploaded artifact. This
+document is the checklist.
 
 ## Prerequisites
 
@@ -15,10 +17,11 @@ version bump, a tag, and an uploaded artifact. This document is the checklist.
   `wyvernsystems` account with `repo` scope: `gh auth status`.
 - `@vscode/vsce` — already a dev dependency, so `npm install` is enough. No
   global install required.
-- For the optional Marketplace step only: a Visual Studio Marketplace personal
+- For the optional marketplace step only: a Visual Studio Marketplace personal
   access token for the `WyvernSystemsLLC` publisher, supplied as the
-  `VSCE_PAT` environment variable. Never commit it or paste it into a
-  changelog, release note, or commit message.
+  `VSCE_PAT` environment variable, and/or an [Open VSX](https://open-vsx.org)
+  access token for the same namespace, supplied as `OVSX_PAT`. Never commit a
+  token or paste it into a changelog, release note, or commit message.
 
 ## Versioning
 
@@ -65,10 +68,10 @@ tracked in this repo — nothing in the release path reads from it.
 
 `npm run sync-bundled` also regenerates `bundled/rule-packs/` — one
 ready-to-copy folder per host (`cursor/`, `cline/`, `opencode/`,
-`claude-code/`), rendered from `bundled/ai-rules/` the same way the extension
-mirrors rules into a workspace. These folders are tracked in git so anyone
-can browse or grab them without installing the extension; commit them
-whenever a rule change leaves them stale.
+`claude-code/`, `windsurf/`, `copilot/`), rendered from `bundled/ai-rules/`
+the same way the extension mirrors rules into a workspace. These folders are
+tracked in git so anyone can browse or grab them without installing the
+extension; commit them whenever a rule change leaves them stale.
 
 ### 2. Bump the version
 
@@ -138,6 +141,8 @@ gh release create vX.Y.Z \
   ai-rulebook-rules-cline-X.Y.Z.zip \
   ai-rulebook-rules-opencode-X.Y.Z.zip \
   ai-rulebook-rules-claude-code-X.Y.Z.zip \
+  ai-rulebook-rules-windsurf-X.Y.Z.zip \
+  ai-rulebook-rules-copilot-X.Y.Z.zip \
   --title "AI Rulebook X.Y.Z" \
   --notes-file <notes.md>
 ```
@@ -157,17 +162,32 @@ Conventions carried forward from earlier releases:
 Write the notes to a scratch file rather than passing them inline; the
 gitignore already covers `.github-release-notes-*.md` for this purpose.
 
-### 7. Publish to the Marketplace (optional)
+### 7. Publish to the marketplaces (optional)
 
-GitHub is the primary distribution channel. To also push to the Visual Studio
-Marketplace:
+GitHub is the primary distribution channel. Two marketplaces can additionally
+carry the release, and both are published from the same `.vsix`. Using the
+built artifact (`--packagePath` for vsce, the positional path for ovsx)
+publishes the exact file attached to the GitHub release instead of rebuilding
+it, so the channels cannot diverge.
+
+**Visual Studio Marketplace** — reaches VS Code itself:
 
 ```bash
 VSCE_PAT=<token> npx vsce publish --packagePath ai-rulebook-X.Y.Z.vsix
 ```
 
-Using `--packagePath` publishes the exact artifact attached to the GitHub
-release instead of rebuilding it, so the two channels cannot diverge.
+**Open VSX** — reaches the hosts that default to the Open VSX registry
+instead of Microsoft's (VSCodium, Windsurf, Gitpod, Eclipse Theia, and other
+VS Code forks), which is most of the audience this extension targets:
+
+```bash
+OVSX_PAT=<token> npx ovsx publish ai-rulebook-X.Y.Z.vsix
+```
+
+`ovsx` is a dev dependency, so `npm install` provides it. One-time setup for
+a new publisher: create an [Eclipse Foundation Open VSX](https://open-vsx.org)
+account, generate the token there, and claim the namespace once with
+`npx ovsx create-namespace WyvernSystemsLLC -p <token>`.
 
 ## Hotfix releases
 

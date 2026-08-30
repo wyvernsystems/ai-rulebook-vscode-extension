@@ -45,11 +45,15 @@ describe("VS Code package contributions", () => {
       "aiRules.syncClineWorkspace",
       "aiRules.syncOpencodeWorkspace",
       "aiRules.syncClaudeWorkspace",
+      "aiRules.syncWindsurfWorkspace",
+      "aiRules.syncCopilotWorkspace",
       "aiRules.syncAllFormatsWorkspace",
       "aiRules.removeCursorWorkspace",
       "aiRules.removeClineWorkspace",
       "aiRules.removeOpencodeWorkspace",
       "aiRules.removeClaudeWorkspace",
+      "aiRules.removeWindsurfWorkspace",
+      "aiRules.removeCopilotWorkspace",
       "aiRules.removeAllFormatsWorkspace",
     ]) {
       assert.ok(commandIds.has(command), `missing format command: ${command}`);
@@ -145,6 +149,8 @@ describe("VS Code package contributions", () => {
       "aiRules.autoSyncClineWhenInstalled",
       "aiRules.autoSyncOpencodeWhenInstalled",
       "aiRules.autoSyncClaudeWhenInstalled",
+      "aiRules.autoSyncWindsurfWhenInstalled",
+      "aiRules.autoSyncCopilotWhenInstalled",
     ];
 
     for (const settingId of booleanSettingIds) {

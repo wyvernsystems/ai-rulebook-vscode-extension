@@ -24,12 +24,16 @@ const RULES_DIR_SEGMENTS = [".cursor", "rules", RULES_SUBDIR] as const;
 const CLINE_RULES_DIR_SEGMENTS = [".clinerules", RULES_SUBDIR] as const;
 const OPENCODE_RULES_DIR_SEGMENTS = [".opencode", "rules", RULES_SUBDIR] as const;
 const CLAUDE_RULES_DIR_SEGMENTS = [".claude", "rules", RULES_SUBDIR] as const;
+const WINDSURF_RULES_DIR_SEGMENTS = [".windsurf", "rules", RULES_SUBDIR] as const;
+const COPILOT_RULES_DIR_SEGMENTS = [".github", "instructions", RULES_SUBDIR] as const;
 
 export type RuleFormatRemovalResult = {
   cursor: boolean;
   cline: boolean;
   opencode: boolean;
   claude: boolean;
+  windsurf: boolean;
+  copilot: boolean;
 };
 
 export function workspaceRulesDir(workspaceRoot: string): string {
@@ -39,6 +43,16 @@ export function workspaceRulesDir(workspaceRoot: string): string {
 /** Claude Code auto-discovers every `.md` file under `.claude/rules/`. */
 export function workspaceClaudeRulesDir(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".claude", "rules", RULES_SUBDIR);
+}
+
+/** Windsurf auto-discovers every `.md` file under `.windsurf/rules/`. */
+export function workspaceWindsurfRulesDir(workspaceRoot: string): string {
+  return path.join(workspaceRoot, ".windsurf", "rules", RULES_SUBDIR);
+}
+
+/** GitHub Copilot auto-discovers every `*.instructions.md` file under `.github/instructions/`. */
+export function workspaceCopilotRulesDir(workspaceRoot: string): string {
+  return path.join(workspaceRoot, ".github", "instructions", RULES_SUBDIR);
 }
 
 export async function pathExists(p: string): Promise<boolean> {
@@ -468,9 +482,17 @@ export function workspaceOpencodeRulesDir(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".opencode", "rules", RULES_SUBDIR);
 }
 
-/** `<topic>.mdc` -> `<topic>.md`, shared by the opencode and Claude Code mirrors. */
+/** `<topic>.mdc` -> `<topic>.md`, shared by the opencode, Claude Code, and Windsurf mirrors. */
 function mdcToMdName(ruleFile: string): string {
   return `${ruleFile.replace(/\.mdc$/, "")}.md`;
+}
+
+/**
+ * `<topic>.mdc` -> `<topic>.instructions.md`. GitHub Copilot only discovers
+ * path-specific instructions whose filename ends with `.instructions.md`.
+ */
+function mdcToInstructionsMdName(ruleFile: string): string {
+  return `${ruleFile.replace(/\.mdc$/, "")}.instructions.md`;
 }
 
 /**
@@ -701,6 +723,257 @@ export async function syncClaudeMirrorFromWorkspace(
   }
 }
 
+/**
+ * True when the workspace shows evidence of Windsurf usage: a `.windsurf/`
+ * directory, or a `.windsurfrules` file (the legacy single-file format).
+ * Used to gate the automatic Windsurf sync (the manual command ignores this
+ * check).
+ */
+export async function workspaceUsesWindsurf(workspaceRoot: string): Promise<boolean> {
+  const candidates = [
+    path.join(workspaceRoot, ".windsurf"),
+    path.join(workspaceRoot, ".windsurfrules"),
+  ];
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Converts a Cursor `.mdc` rule body into a Windsurf `.windsurf/rules/` body:
+ * strips the Cursor frontmatter and replaces it with Windsurf's `trigger:`
+ * frontmatter, which — unlike Claude's `paths:` — is required on every rule.
+ * A rule with a `globs` pattern becomes `trigger: glob` with the pattern
+ * carried over; a rule with none becomes `trigger: always_on`, Windsurf's
+ * equivalent of Cursor's `alwaysApply: true`.
+ */
+export function convertCursorRuleToWindsurfRule(body: string): string {
+  const fields = parseCursorFrontmatterFields(body);
+  const rest = stripCursorFrontmatter(body);
+  const globs = fields?.globs;
+  const frontmatter = globs
+    ? `trigger: glob\nglobs: ${JSON.stringify(globs)}`
+    : "trigger: always_on";
+  return `---\n${frontmatter}\n---\n\n${rest}`;
+}
+
+/**
+ * Copies each bundled rule into `.windsurf/rules/ai-rules/` as a plain
+ * `<topic>.md` file with the Cursor frontmatter converted to Windsurf's
+ * `trigger:` form, and keeps the generated folder out of source control. The
+ * mirror reflects the workspace's Cursor rule state: enabled rules are
+ * written as `<topic>.md`, disabled ones as `<topic>.md.disabled` (Windsurf
+ * only auto-loads `.md` files, so disabled mirrors are skipped). When the
+ * workspace has no Cursor rules folder yet, every rule defaults to enabled.
+ */
+export async function syncBundledMdcsToWindsurfRules(
+  workspaceRoot: string,
+  bundleDir: string,
+  ruleFiles: readonly string[],
+  testCommand: TestCommand
+): Promise<void> {
+  const cursorDir = workspaceRulesDir(workspaceRoot);
+  const hasCursorRules = await pathExists(cursorDir);
+  const dest = workspaceWindsurfRulesDir(workspaceRoot);
+  const mirrors = await Promise.all(
+    ruleFiles.map(async (ruleFile) => {
+      const source = await bundledRulePath(bundleDir, ruleFile);
+      const enabled = hasCursorRules ? await isRuleEnabled(cursorDir, ruleFile) : true;
+      return {
+        body: renderRuleBody(
+          convertCursorRuleToWindsurfRule(await fs.readFile(source, "utf8")),
+          testCommand
+        ),
+        enabled,
+        destination: safeJoinUnderBase(dest, mdcToMdName(ruleFile), "Windsurf rules directory"),
+      };
+    })
+  );
+  await fs.mkdir(dest, { recursive: true });
+  for (const { body, enabled, destination } of mirrors) {
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await writeRuleMirror(destination, body, enabled);
+  }
+}
+
+/**
+ * Mirrors one rule into `.windsurf/rules/ai-rules/` from the workspace's
+ * Cursor rule file (`<topic>.mdc` when enabled, `<topic>.mdc.disabled` when
+ * off), with the frontmatter converted. Used to keep the Windsurf mirror in
+ * sync immediately after a sidebar toggle.
+ */
+export async function mirrorRuleToWindsurf(
+  workspaceRoot: string,
+  ruleFile: string,
+  enabled: boolean
+): Promise<void> {
+  const cursorActive = safeJoinUnderBase(
+    workspaceRulesDir(workspaceRoot),
+    ruleFile,
+    "rules directory"
+  );
+  const sourcePath = enabled ? cursorActive : `${cursorActive}.disabled`;
+  if (!(await pathExists(sourcePath))) {
+    return;
+  }
+  const body = convertCursorRuleToWindsurfRule(await fs.readFile(sourcePath, "utf8"));
+  const destination = safeJoinUnderBase(
+    workspaceWindsurfRulesDir(workspaceRoot),
+    mdcToMdName(ruleFile),
+    "Windsurf rules directory"
+  );
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await writeRuleMirror(destination, body, enabled);
+}
+
+/**
+ * Rewrites the whole Windsurf mirror from the workspace's current Cursor
+ * rule state. No-op when the workspace has no Cursor rules folder. Used
+ * after bulk enable / disable commands.
+ */
+export async function syncWindsurfMirrorFromWorkspace(
+  workspaceRoot: string,
+  ruleFiles: readonly string[]
+): Promise<void> {
+  const cursorDir = workspaceRulesDir(workspaceRoot);
+  if (!(await pathExists(cursorDir))) {
+    return;
+  }
+  for (const ruleFile of ruleFiles) {
+    await mirrorRuleToWindsurf(workspaceRoot, ruleFile, await isRuleEnabled(cursorDir, ruleFile));
+  }
+}
+
+/**
+ * True when the workspace shows evidence of GitHub Copilot custom
+ * instructions usage: a `.github/copilot-instructions.md` file, or a
+ * `.github/instructions/` directory. Used to gate the automatic Copilot
+ * sync (the manual command ignores this check).
+ */
+export async function workspaceUsesCopilot(workspaceRoot: string): Promise<boolean> {
+  const candidates = [
+    path.join(workspaceRoot, ".github", "copilot-instructions.md"),
+    path.join(workspaceRoot, ".github", "instructions"),
+  ];
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Converts a Cursor `.mdc` rule body into a GitHub Copilot
+ * `.github/instructions/` body: strips the Cursor frontmatter and replaces
+ * it with Copilot's `applyTo:` frontmatter, which is required on every
+ * `*.instructions.md` file. A rule with a `globs` pattern carries it over as
+ * `applyTo`; a rule with none becomes `applyTo: "**"`, matching every file —
+ * Copilot's equivalent of Cursor's `alwaysApply: true`.
+ */
+export function convertCursorRuleToCopilotRule(body: string): string {
+  const fields = parseCursorFrontmatterFields(body);
+  const rest = stripCursorFrontmatter(body);
+  const applyTo = fields?.globs ?? "**";
+  return `---\napplyTo: ${JSON.stringify(applyTo)}\n---\n\n${rest}`;
+}
+
+/**
+ * Copies each bundled rule into `.github/instructions/ai-rules/` as a
+ * `<topic>.instructions.md` file with the Cursor frontmatter converted to
+ * Copilot's `applyTo:` form, and keeps the generated folder out of source
+ * control. The mirror reflects the workspace's Cursor rule state: enabled
+ * rules are written as `<topic>.instructions.md`, disabled ones as
+ * `<topic>.instructions.md.disabled` (Copilot only discovers files whose
+ * name ends with `.instructions.md`, so disabled mirrors are skipped, with
+ * no config registration needed). When the workspace has no Cursor rules
+ * folder yet, every rule defaults to enabled.
+ */
+export async function syncBundledMdcsToCopilotRules(
+  workspaceRoot: string,
+  bundleDir: string,
+  ruleFiles: readonly string[],
+  testCommand: TestCommand
+): Promise<void> {
+  const cursorDir = workspaceRulesDir(workspaceRoot);
+  const hasCursorRules = await pathExists(cursorDir);
+  const dest = workspaceCopilotRulesDir(workspaceRoot);
+  const mirrors = await Promise.all(
+    ruleFiles.map(async (ruleFile) => {
+      const source = await bundledRulePath(bundleDir, ruleFile);
+      const enabled = hasCursorRules ? await isRuleEnabled(cursorDir, ruleFile) : true;
+      return {
+        body: renderRuleBody(
+          convertCursorRuleToCopilotRule(await fs.readFile(source, "utf8")),
+          testCommand
+        ),
+        enabled,
+        destination: safeJoinUnderBase(
+          dest,
+          mdcToInstructionsMdName(ruleFile),
+          "GitHub Copilot instructions directory"
+        ),
+      };
+    })
+  );
+  await fs.mkdir(dest, { recursive: true });
+  for (const { body, enabled, destination } of mirrors) {
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await writeRuleMirror(destination, body, enabled);
+  }
+}
+
+/**
+ * Mirrors one rule into `.github/instructions/ai-rules/` from the
+ * workspace's Cursor rule file (`<topic>.mdc` when enabled,
+ * `<topic>.mdc.disabled` when off), with the frontmatter converted. Used to
+ * keep the Copilot mirror in sync immediately after a sidebar toggle.
+ */
+export async function mirrorRuleToCopilot(
+  workspaceRoot: string,
+  ruleFile: string,
+  enabled: boolean
+): Promise<void> {
+  const cursorActive = safeJoinUnderBase(
+    workspaceRulesDir(workspaceRoot),
+    ruleFile,
+    "rules directory"
+  );
+  const sourcePath = enabled ? cursorActive : `${cursorActive}.disabled`;
+  if (!(await pathExists(sourcePath))) {
+    return;
+  }
+  const body = convertCursorRuleToCopilotRule(await fs.readFile(sourcePath, "utf8"));
+  const destination = safeJoinUnderBase(
+    workspaceCopilotRulesDir(workspaceRoot),
+    mdcToInstructionsMdName(ruleFile),
+    "GitHub Copilot instructions directory"
+  );
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await writeRuleMirror(destination, body, enabled);
+}
+
+/**
+ * Rewrites the whole Copilot mirror from the workspace's current Cursor
+ * rule state. No-op when the workspace has no Cursor rules folder. Used
+ * after bulk enable / disable commands.
+ */
+export async function syncCopilotMirrorFromWorkspace(
+  workspaceRoot: string,
+  ruleFiles: readonly string[]
+): Promise<void> {
+  const cursorDir = workspaceRulesDir(workspaceRoot);
+  if (!(await pathExists(cursorDir))) {
+    return;
+  }
+  for (const ruleFile of ruleFiles) {
+    await mirrorRuleToCopilot(workspaceRoot, ruleFile, await isRuleEnabled(cursorDir, ruleFile));
+  }
+}
+
 async function removeRulesDirIfPresent(
   target: string,
   expectedSegments: readonly string[],
@@ -750,6 +1023,24 @@ export async function removeClaudeRules(workspaceRoot: string): Promise<boolean>
   );
 }
 
+/** Deletes `.windsurf/rules/ai-rules/` when present. Returns whether anything was removed. */
+export async function removeWindsurfRules(workspaceRoot: string): Promise<boolean> {
+  return removeRulesDirIfPresent(
+    workspaceWindsurfRulesDir(workspaceRoot),
+    WINDSURF_RULES_DIR_SEGMENTS,
+    "Windsurf rules folder"
+  );
+}
+
+/** Deletes `.github/instructions/ai-rules/` when present. Returns whether anything was removed. */
+export async function removeCopilotRules(workspaceRoot: string): Promise<boolean> {
+  return removeRulesDirIfPresent(
+    workspaceCopilotRulesDir(workspaceRoot),
+    COPILOT_RULES_DIR_SEGMENTS,
+    "GitHub Copilot instructions folder"
+  );
+}
+
 /** Deletes every supported rule-pack folder that exists in the workspace. */
 export async function removeAllRuleFormats(
   workspaceRoot: string
@@ -759,6 +1050,8 @@ export async function removeAllRuleFormats(
     cline: await removeClineRules(workspaceRoot),
     opencode: await removeOpencodeRules(workspaceRoot),
     claude: await removeClaudeRules(workspaceRoot),
+    windsurf: await removeWindsurfRules(workspaceRoot),
+    copilot: await removeCopilotRules(workspaceRoot),
   };
 }
 

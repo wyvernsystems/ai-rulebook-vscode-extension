@@ -2,13 +2,14 @@
 /**
  * Renders `bundled/ai-rules/` (the Cursor-format source of truth) into a
  * ready-to-copy folder per supported host under `bundled/rule-packs/`:
- * `cursor/`, `cline/`, `opencode/`, and `claude-code/`. These folders are
- * tracked in git and shipped as release assets so someone who does not want
- * to install the extension can still grab a working rule pack for their
- * tool of choice.
+ * `cursor/`, `cline/`, `opencode/`, `claude-code/`, `windsurf/`, and
+ * `copilot/`. These folders are tracked in git and shipped as release
+ * assets so someone who does not want to install the extension can still
+ * grab a working rule pack for their tool of choice.
  *
  * The conversions here (frontmatter stripping, Claude `paths:` conversion,
- * Cline's flat naming, the disabled-file convention) mirror the mirroring
+ * Windsurf `trigger:` conversion, Copilot `applyTo:` conversion, Cline's
+ * flat naming, the disabled-file convention) mirror the mirroring
  * logic in `src/rulesOperations.ts`. They are duplicated rather than
  * imported because this script runs directly with `node`, before `tsc` has
  * produced anything in `out/` — the same reason `verify-bundled.mjs` avoids
@@ -100,14 +101,36 @@ function convertCursorRuleToClaudeRule(body) {
   return `---\npaths:\n  - ${JSON.stringify(globs)}\n---\n\n${rest}`;
 }
 
+function convertCursorRuleToWindsurfRule(body) {
+  const fields = parseCursorFrontmatterFields(body);
+  const rest = stripCursorFrontmatter(body);
+  const globs = fields?.globs;
+  const frontmatter = globs
+    ? `trigger: glob\nglobs: ${JSON.stringify(globs)}`
+    : "trigger: always_on";
+  return `---\n${frontmatter}\n---\n\n${rest}`;
+}
+
+function convertCursorRuleToCopilotRule(body) {
+  const fields = parseCursorFrontmatterFields(body);
+  const rest = stripCursorFrontmatter(body);
+  const applyTo = fields?.globs ?? "**";
+  return `---\napplyTo: ${JSON.stringify(applyTo)}\n---\n\n${rest}`;
+}
+
 /** `foo.mdc` -> `ai-rules-foo.md`, Cline's flat mirror naming. */
 function clineMirrorName(ruleFile) {
   return `ai-rules-${ruleFile.slice(0, -".mdc".length).replaceAll("/", "-")}.md`;
 }
 
-/** `foo.mdc` -> `foo.md`, shared by the opencode and Claude Code packs. */
+/** `foo.mdc` -> `foo.md`, shared by the opencode, Claude Code, and Windsurf packs. */
 function mdcToMdName(ruleFile) {
   return `${ruleFile.replace(/\.mdc$/, "")}.md`;
+}
+
+/** `foo.mdc` -> `foo.instructions.md`, GitHub Copilot's required file suffix. */
+function mdcToInstructionsMdName(ruleFile) {
+  return `${ruleFile.replace(/\.mdc$/, "")}.instructions.md`;
 }
 
 if (!fs.existsSync(sourceDir)) {
@@ -179,6 +202,29 @@ const PACKS = [
       "Copy this folder to `.claude/rules/ai-rules/` at the root of your project. " +
       "Claude Code auto-discovers every `.md` file under `.claude/rules/`, so no config " +
       "changes are needed. A `.md.disabled` file is skipped — rename it back to `.md` to turn it on.",
+  },
+  {
+    id: "windsurf",
+    label: "Windsurf",
+    dirName: "ai-rules",
+    render: convertCursorRuleToWindsurfRule,
+    fileName: mdcToMdName,
+    usage:
+      "Copy this folder to `.windsurf/rules/ai-rules/` at the root of your project. " +
+      "Windsurf auto-discovers every `.md` file under `.windsurf/rules/`, so no config " +
+      "changes are needed. A `.md.disabled` file is skipped — rename it back to `.md` to turn it on.",
+  },
+  {
+    id: "copilot",
+    label: "GitHub Copilot",
+    dirName: "ai-rules",
+    render: convertCursorRuleToCopilotRule,
+    fileName: mdcToInstructionsMdName,
+    usage:
+      "Copy this folder to `.github/instructions/ai-rules/` at the root of your project. " +
+      "GitHub Copilot auto-discovers every `*.instructions.md` file under `.github/instructions/`, " +
+      "so no config changes are needed. A `.instructions.md.disabled` file is skipped — rename it " +
+      "back to `.instructions.md` to turn it on.",
   },
 ];
 
