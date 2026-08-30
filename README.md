@@ -47,13 +47,15 @@ turns every rule back on.
 ## The rules
 
 - **`scope.mdc`** — change only what the task requires; tests and docs for
-  that change are in scope; match the conventions of the file being edited.
-- **`code.mdc`** — reuse existing helpers, organize by feature, choose safe
-  dependencies, validate input, never log or commit secrets, wrap errors.
-- **`tests.mdc`** — write failing tests for the requirement first, then the
-  code; add or update unit tests for behavior changes; run the lint and type
-  checks the project already has; never weaken a test to make it pass; report
-  every failing or unrun check.
+  that change are in scope; match the conventions of the file being edited;
+  report unrelated bugs instead of fixing them.
+- **`code.mdc`** — reuse existing helpers, organize by feature, prefer the
+  standard library over new dependencies and choose safe ones, validate
+  input at trust boundaries, never log or commit secrets, wrap errors.
+- **`tests.mdc`** — for behavior changes, write failing tests for the
+  requirement first, then the code; run the lint and type checks the project
+  already has; never weaken a test to make it pass; report every failing or
+  unrun check.
 - **`docs.mdc`** — update `README.md`, `CHANGELOG.md`, `AGENTS.md`,
   `CONTRIBUTING.md`, Spec Kit feature specs (`specs/<NNN-feature>/spec.md`),
   `docs/ARCHITECTURE.md`, `docs/RELEASING.md`, `docs/DEPLOY.md`, and
@@ -65,7 +67,9 @@ turns every rule back on.
 - **`markdown.mdc`** — one H1, no skipped heading levels, `-` bullets,
   language-tagged code fences, inline code for paths and commands, relative
   links. Scoped to `**/*.{md,mdx}`, so it only loads while editing Markdown.
-- **`git.mdc`** — no commits, pushes, or branches unless asked.
+- **`git.mdc`** — no commits, pushes, or branches unless asked; when asked,
+  stage only the task's files and write an imperative subject; never rewrite
+  pushed history unless the user names the operation.
 
 `tests.mdc` names your project's own test command. On install the extension
 detects it from a `package.json` `test` script (using the lockfile to pick
@@ -248,7 +252,7 @@ the source. Change a rule in `bundled/ai-rules/`, then re-run the install or
 a sync command to regenerate it.
 
 Requirements are tracked in [docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md).
-Cutting a release is documented in [docs/DEPLOY.md](./docs/DEPLOY.md).
+Cutting a release is documented in [docs/RELEASING.md](./docs/RELEASING.md).
 Agent-facing build and workflow facts are in [AGENTS.md](./AGENTS.md).
 
 ## Limitations

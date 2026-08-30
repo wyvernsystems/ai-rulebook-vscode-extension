@@ -31,4 +31,4 @@ npm run package       # build the VSIX
 - This repo follows its own rule pack: the scope, tests-first, docs,
   Markdown, and Git rules in `bundled/ai-rules/` apply to every change here.
 - Requirements live in [docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md);
-  releases are cut per [docs/DEPLOY.md](./docs/DEPLOY.md).
+  releases are cut per [docs/RELEASING.md](./docs/RELEASING.md).

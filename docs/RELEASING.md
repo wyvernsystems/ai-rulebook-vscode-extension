@@ -1,4 +1,4 @@
-# Deploying AI Rulebook
+# Releasing AI Rulebook
 
 AI Rulebook ships as a `.vsix` extension package built locally and attached to
 a GitHub release. There is no CI pipeline and no deploy server: a release is a

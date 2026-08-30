@@ -75,7 +75,7 @@ details belong in the code or in the rule files.
   ever reads from `bundled/ai-rules/`.
 - `npm run package-rule-packs` zips each `bundled/rule-packs/<tool>/` folder
   into `ai-rulebook-rules-<tool>-X.Y.Z.zip` at the repository root, for
-  attaching to a GitHub release alongside the `.vsix` (see DEPLOY.md). The
+  attaching to a GitHub release alongside the `.vsix` (see RELEASING.md). The
   zips are gitignored build artifacts, not tracked.
 - The bundled rules constrain task scope, code reuse and organization,
   dependency choices, input and error safety, testing integrity, triggered
