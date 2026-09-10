@@ -154,10 +154,10 @@ async function renderBundledRule(
     raw = await fs.readFile(abs, "utf8");
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(`Bundled rule missing: ${ruleFile}`);
+      throw new Error(`Bundled rule missing: ${ruleFile}`, { cause: e });
     }
     const reason = e instanceof Error ? e.message : String(e);
-    throw new Error(`Failed to read bundled rule ${ruleFile}: ${reason}`);
+    throw new Error(`Failed to read bundled rule ${ruleFile}: ${reason}`, { cause: e });
   }
   return renderRuleForAgentsMd(raw, testCommand);
 }
@@ -264,7 +264,7 @@ async function readAgentsMd(workspaceRoot: string): Promise<string | null> {
       return null;
     }
     const reason = e instanceof Error ? e.message : String(e);
-    throw new Error(`Failed to read ${AGENTS_MD}: ${reason}`);
+    throw new Error(`Failed to read ${AGENTS_MD}: ${reason}`, { cause: e });
   }
 }
 
@@ -280,7 +280,7 @@ async function writeAgentsMd(workspaceRoot: string, text: string): Promise<void>
     await fs.writeFile(agentsMdPath(workspaceRoot), text, "utf8");
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
-    throw new Error(`Failed to write ${AGENTS_MD}: ${reason}`);
+    throw new Error(`Failed to write ${AGENTS_MD}: ${reason}`, { cause: e });
   }
 }
 

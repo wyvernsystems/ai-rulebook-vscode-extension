@@ -8,10 +8,9 @@ document is the checklist.
 
 ## Prerequisites
 
-- A supported Node.js release meeting the locked build dependencies. The
-  installed `@vscode/vsce` requires Node.js 20 or newer. The extension
-  declares `engines.node: >=18.18.0` and CI tests Node 18/20, but that older
-  runtime declaration is not sufficient for packaging.
+- Node.js 24 for linting and packaging. The extension declares
+  `engines.node: >=18.18.0` and CI tests Node 18/20, but development tooling
+  requires a newer runtime. CI runs ESLint separately on Node 24.
 - A clean working tree on `main`, up to date with `origin/main`.
 - [GitHub CLI](https://cli.github.com/) authenticated against the
   repository with an account allowed to publish releases: `gh auth status`.
@@ -52,6 +51,7 @@ git checkout main
 git pull --ff-only
 git status --short          # must be empty
 npm ci
+npm run lint
 npm test
 ```
 
@@ -102,6 +102,7 @@ someone deciding whether to upgrade, not as a commit log.
 ### 4. Verify and build
 
 ```bash
+npm run lint
 npm run test:coverage
 npm run package
 ```

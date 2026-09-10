@@ -247,19 +247,22 @@ are no longer written or updated. After installing this version:
 
 ## Development
 
-Use a supported Node.js release compatible with the lockfile. Packaging
-requires Node.js 20 or newer (`@vscode/vsce`), even though the extension
-declares Node.js `>=18.18.0` and CI currently tests Node 18 and 20.
+Use Node.js 24 for development, linting, and packaging. ESLint requires
+Node.js 20.19+, 22.13+, or 24+. The extension still declares Node.js
+`>=18.18.0`; CI tests Node 18 and 20 and runs lint on Node 24.
 
 ```bash
 npm ci
+npm run lint
 npm test
 npm run package
 ```
 
 `npm test` cleans and compiles TypeScript, verifies the bundle, and runs
-`node:test`, including temporary-workspace and build-script tests. There is
-no configured linter. `npm run test:coverage` adds coverage reporting.
+`node:test`, including temporary-workspace and build-script tests.
+`npm run lint` checks `src/**/*.ts` with the recommended ESLint and
+typescript-eslint rules and rejects warnings. `npm run test:coverage` adds
+coverage reporting.
 For extension-host debugging, run `npm run compile` (or `npm run watch`)
 before launching **Run Extension** with F5; the launch configuration does
 not build automatically.

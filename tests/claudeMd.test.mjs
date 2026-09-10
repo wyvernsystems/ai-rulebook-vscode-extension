@@ -131,7 +131,11 @@ describe("CLAUDE.md filesystem failures", () => {
   test("reports a read failure without replacing the path", async () => {
     await withRoot(async (root, file) => {
       await fs.mkdir(file);
-      await assert.rejects(ensureAgentsMdImport(root), /Failed to read CLAUDE\.md/);
+      await assert.rejects(ensureAgentsMdImport(root), (error) => {
+        assert.match(error.message, /Failed to read CLAUDE\.md/);
+        assert.equal(error.cause.code, "EISDIR");
+        return true;
+      });
       assert.equal((await fs.stat(file)).isDirectory(), true);
     });
   });

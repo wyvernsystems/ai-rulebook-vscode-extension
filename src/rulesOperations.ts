@@ -113,7 +113,7 @@ async function removeIfPresent(
     await fs.rm(target, { recursive: true, force: true });
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
-    throw new Error(`Failed to remove ${label} at ${target}: ${reason}`);
+    throw new Error(`Failed to remove ${label} at ${target}: ${reason}`, { cause: e });
   }
   return true;
 }

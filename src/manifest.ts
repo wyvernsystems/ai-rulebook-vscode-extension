@@ -15,7 +15,7 @@ export function readBundleManifest(extensionRoot: string): BundleManifest {
     parsed = JSON.parse(raw);
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
-    throw new Error(`Invalid bundled manifest JSON at ${manifestPath}: ${reason}`);
+    throw new Error(`Invalid bundled manifest JSON at ${manifestPath}: ${reason}`, { cause: e });
   }
   return validateManifest(parsed, manifestPath);
 }

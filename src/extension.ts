@@ -110,7 +110,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if ((e as NodeJS.ErrnoException).code === "ENOENT") {
         return null;
       }
-      throw new Error(`Failed to read ${AGENTS_MD}: ${errorMessage(e)}`);
+      throw new Error(`Failed to read ${AGENTS_MD}: ${errorMessage(e)}`, { cause: e });
     }
     const parsed = parseAgentsMd(text);
     if (!parsed) {

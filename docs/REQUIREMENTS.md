@@ -126,10 +126,10 @@ details belong in the code or in the rule files.
 - **Publisher**: `WyvernSystemsLLC`. Marketplace package id
   `WyvernSystemsLLC.ai-rulebook`.
 - **Declared engines**: VS Code `^1.85.0`, Node `>=18.18.0`. The locked
-  packaging tools require Node.js 20 or newer. CI currently tests Node 18
-  and 20 on pushes to `main` and every pull request.
+  development tools use Node.js 24. CI tests Node 18 and 20 and runs
+  `npm run lint` on Node 24 on pushes to `main` and every pull request.
 - **No runtime dependencies.** Only `@types/*`, `@vscode/vsce`, `ovsx`, and
-  `typescript` as devDependencies.
+  TypeScript and ESLint tooling as devDependencies.
 - **No network access.** The extension must never make outbound HTTP calls.
 - **No secret material.** The extension must never read or write credentials,
   tokens, environment variables, or anything outside its allowed paths.

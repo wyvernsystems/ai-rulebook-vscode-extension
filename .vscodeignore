@@ -17,6 +17,7 @@ node_modules/**
 .editorconfig
 .npmrc
 tsconfig.json
+eslint.config.mjs
 package-lock.json
 *.vsix
 ai-rulebook-rules-*.zip

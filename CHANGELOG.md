@@ -20,6 +20,8 @@ All notable changes to this project are documented here. The format follows
 - Unreadable rule files now show an error in the sidebar instead of appearing
   disabled. Filesystem failures during project detection and legacy cleanup
   are reported instead of being treated as missing files.
+- Wrapped filesystem and manifest errors preserve their original cause for
+  troubleshooting.
 
 ## [4.0.0] - 2026-09-09
 

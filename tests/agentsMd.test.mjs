@@ -537,7 +537,11 @@ describe("rule file error handling", () => {
   test("reports an unreadable AGENTS.md without changing it", async () => {
     await withFixture(async ({ root, file }) => {
       await fs.mkdir(file);
-      await assert.rejects(hasRulesBlock(root), /Failed to read AGENTS\.md/);
+      await assert.rejects(hasRulesBlock(root), (error) => {
+        assert.match(error.message, /Failed to read AGENTS\.md/);
+        assert.equal(error.cause.code, "EISDIR");
+        return true;
+      });
       assert.equal((await fs.stat(file)).isDirectory(), true);
     });
   });

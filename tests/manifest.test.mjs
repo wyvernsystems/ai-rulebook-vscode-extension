@@ -94,7 +94,11 @@ describe("readBundleManifest validation", () => {
   test("rejects invalid JSON", async () => {
     const dir = await writeExtensionRoot("{not json");
     try {
-      assert.throws(() => readBundleManifest(dir), /Invalid bundled manifest JSON/);
+      assert.throws(() => readBundleManifest(dir), (error) => {
+        assert.match(error.message, /Invalid bundled manifest JSON/);
+        assert.ok(error.cause instanceof SyntaxError);
+        return true;
+      });
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }

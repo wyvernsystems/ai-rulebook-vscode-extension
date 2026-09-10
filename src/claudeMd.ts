@@ -64,7 +64,7 @@ async function readClaudeMd(workspaceRoot: string): Promise<string | null> {
       return null;
     }
     const reason = e instanceof Error ? e.message : String(e);
-    throw new Error(`Failed to read ${CLAUDE_MD}: ${reason}`);
+    throw new Error(`Failed to read ${CLAUDE_MD}: ${reason}`, { cause: e });
   }
 }
 
@@ -73,7 +73,7 @@ async function writeClaudeMd(workspaceRoot: string, text: string): Promise<void>
     await fs.writeFile(claudeMdPath(workspaceRoot), text, "utf8");
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
-    throw new Error(`Failed to write ${CLAUDE_MD}: ${reason}`);
+    throw new Error(`Failed to write ${CLAUDE_MD}: ${reason}`, { cause: e });
   }
 }
 
