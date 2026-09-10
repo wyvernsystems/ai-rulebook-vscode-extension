@@ -1,10 +1,5 @@
 import * as vscode from "vscode";
-import {
-  isRuleEnabled,
-  pathExists,
-  setRuleEnabled,
-  workspaceRulesDir,
-} from "./rulesOperations";
+import { AGENTS_MD, hasRulesBlock, isRuleEnabledInAgentsMd } from "./agentsMd";
 import { UI_COLORS } from "./uiPresentation";
 
 /** ID must match the view contributed in package.json. */
@@ -23,6 +18,13 @@ type RuleItem = {
 };
 
 type Node = RuleItem;
+
+/** Applies one sidebar toggle to the workspace; errors are shown to the user. */
+export type RuleToggleHandler = (
+  workspaceRoot: string,
+  ruleFile: string,
+  enabled: boolean
+) => Promise<void>;
 
 function ruleStatusUri(ruleFile: string, enabled: boolean): vscode.Uri {
   return vscode.Uri.from({
@@ -53,13 +55,13 @@ export class RuleStatusDecorationProvider implements vscode.FileDecorationProvid
     if (uri.path.startsWith("/on/")) {
       return {
         color: new vscode.ThemeColor(UI_COLORS.active),
-        tooltip: "Enabled — loaded by Cursor",
+        tooltip: `Enabled — text present in ${AGENTS_MD}`,
       };
     }
     if (uri.path.startsWith("/off/")) {
       return {
         color: new vscode.ThemeColor(UI_COLORS.inactive),
-        tooltip: "Disabled — not loaded by Cursor",
+        tooltip: `Disabled — text removed from ${AGENTS_MD}`,
       };
     }
     return undefined;
@@ -67,7 +69,8 @@ export class RuleStatusDecorationProvider implements vscode.FileDecorationProvid
 }
 
 /**
- * Tree data provider for the bundled rule pack.
+ * Tree data provider for the bundled rule pack. State is read from the first
+ * workspace folder's `AGENTS.md`.
  */
 export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
   constructor(private readonly ruleFiles: readonly string[]) {}
@@ -76,9 +79,8 @@ export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
   readonly onDidChangeTreeData = this._onDidChange.event;
 
   /**
-   * Callbacks fired after every tree refresh. Lets sibling decoration
-   * providers (sidebar colors, Explorer colors) re-publish without each
-   * call site having to know about them.
+   * Callbacks fired after every tree refresh. Lets the sidebar decoration
+   * provider re-publish without each call site having to know about it.
    */
   private readonly afterRefresh: Array<() => void> = [];
 
@@ -111,7 +113,16 @@ export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
 
   private async ruleTreeItem(node: RuleItem): Promise<vscode.TreeItem> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const enabled = root ? await isRuleEnabled(workspaceRulesDir(root), node.ruleFile) : false;
+    let enabled = false;
+    if (root) {
+      try {
+        enabled = await isRuleEnabledInAgentsMd(root, node.ruleFile);
+      } catch {
+        // A damaged block is reported by the extension on activation; here
+        // the rule simply shows as off rather than breaking the whole tree.
+        enabled = false;
+      }
+    }
     const label = node.ruleFile
       .replace(/\.mdc$/, "")
       .split(/[-_/]/)
@@ -122,7 +133,7 @@ export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
     item.description = enabled ? "Enabled" : "Disabled";
     item.tooltip =
       `${label} · ${enabled ? "Enabled" : "Disabled"}\n${node.ruleFile}\n\n` +
-      "Use the checkbox to change its status. Select the name to open the rule.";
+      `Use the checkbox to change its status. Select the name to open its section in ${AGENTS_MD}.`;
     item.checkboxState = enabled
       ? vscode.TreeItemCheckboxState.Checked
       : vscode.TreeItemCheckboxState.Unchecked;
@@ -137,30 +148,24 @@ export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
     };
     item.command = {
       command: "aiRules.revealRuleFile",
-      title: "Open rule file",
+      title: "Open rule section",
       arguments: [node.ruleFile],
     };
     return item;
   }
-
 }
 
 /**
- * Wires the tree view to checkbox events: a single click on a checkbox flips
- * the rule's `.mdc` ↔ `.mdc.disabled` rename. A workspace must be open and the
- * rule pack must be installed in it—without either, the rename has nothing to
- * act on, so we surface a friendly hint instead of silently failing.
- *
- * `onRuleToggle` (optional) is invoked after every successful toggle with the
- * rule file and its new state. It lets the caller propagate the change to
- * mirrors (Cline / opencode / Claude Code, across every workspace folder)
- * without this module knowing about them.
+ * Wires the tree view to checkbox events: a single click on a checkbox edits
+ * that rule's section in `AGENTS.md` via `toggleRule`. A workspace must be
+ * open and the rule pack must be installed in it—without either there is no
+ * section to edit, so we surface a friendly hint instead of silently failing.
  */
 export function bindRulesTreeView(
   context: vscode.ExtensionContext,
   provider: RulesTreeProvider,
-  afterChange: () => Promise<void>,
-  onRuleToggle?: (ruleFile: string, enabled: boolean) => Promise<void>
+  toggleRule: RuleToggleHandler,
+  afterChange: () => Promise<void>
 ): vscode.TreeView<Node> {
   const view = vscode.window.createTreeView<Node>(RULES_TREE_VIEW_ID, {
     treeDataProvider: provider,
@@ -174,10 +179,9 @@ export function bindRulesTreeView(
       provider.refresh();
       return;
     }
-    const rulesDir = workspaceRulesDir(root);
-    if (!(await pathExists(rulesDir))) {
+    if (!(await hasRulesBlock(root))) {
       vscode.window.showWarningMessage(
-        'AI Rulebook: no rule pack in this workspace yet — run "AI Rulebook: Install / update rule pack" first.'
+        `AI Rulebook: no rule pack in ${AGENTS_MD} yet — run "AI Rulebook: Install / update rule pack" first.`
       );
       provider.refresh();
       return;
@@ -185,21 +189,10 @@ export function bindRulesTreeView(
     for (const [node, state] of e.items) {
       const enable = state === vscode.TreeItemCheckboxState.Checked;
       try {
-        await setRuleEnabled(rulesDir, node.ruleFile, enable);
+        await toggleRule(root, node.ruleFile, enable);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         vscode.window.showErrorMessage(`AI Rulebook: ${node.ruleFile} — ${msg}`);
-        continue;
-      }
-      if (onRuleToggle) {
-        try {
-          await onRuleToggle(node.ruleFile, enable);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          vscode.window.showErrorMessage(
-            `AI Rulebook: mirror sync for ${node.ruleFile} — ${msg}`
-          );
-        }
       }
     }
     await afterChange();

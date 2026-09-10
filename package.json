@@ -1,8 +1,8 @@
 {
   "name": "ai-rulebook",
   "displayName": "AI Rulebook",
-  "description": "AI Rulebook — install and manage focused, always-on engineering rules for Cursor, with optional Cline, opencode, Claude Code, Windsurf, and GitHub Copilot sync.",
-  "version": "3.1.0",
+  "description": "AI Rulebook — install and manage focused, always-on engineering rules in AGENTS.md (with a CLAUDE.md import for Claude Code), shared by Cursor, Cline, opencode, Windsurf, GitHub Copilot, and Claude Code.",
+  "version": "4.0.0",
   "publisher": "WyvernSystemsLLC",
   "license": "MIT",
   "icon": "icon.png",
@@ -70,88 +70,18 @@
         "category": "AI Rulebook"
       },
       {
-        "command": "aiRules.syncClineWorkspace",
-        "title": "AI Rulebook: Sync rule pack to Cline",
+        "command": "aiRules.removeWorkspace",
+        "title": "AI Rulebook: Remove rule pack",
         "category": "AI Rulebook"
       },
       {
-        "command": "aiRules.syncCursorWorkspace",
-        "title": "AI Rulebook: Sync rule pack to Cursor",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.syncOpencodeWorkspace",
-        "title": "AI Rulebook: Sync rule pack to opencode",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.syncClaudeWorkspace",
-        "title": "AI Rulebook: Sync rule pack to Claude Code",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.syncWindsurfWorkspace",
-        "title": "AI Rulebook: Sync rule pack to Windsurf",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.syncCopilotWorkspace",
-        "title": "AI Rulebook: Sync rule pack to GitHub Copilot",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.syncAllFormatsWorkspace",
-        "title": "AI Rulebook: Sync rule pack to all formats",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.removeCursorWorkspace",
-        "title": "AI Rulebook: Remove Cursor rule pack",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.removeClineWorkspace",
-        "title": "AI Rulebook: Remove Cline rule pack",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.removeOpencodeWorkspace",
-        "title": "AI Rulebook: Remove opencode rule pack",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.removeClaudeWorkspace",
-        "title": "AI Rulebook: Remove Claude Code rule pack",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.removeWindsurfWorkspace",
-        "title": "AI Rulebook: Remove Windsurf rule pack",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.removeCopilotWorkspace",
-        "title": "AI Rulebook: Remove GitHub Copilot rule pack",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.removeAllFormatsWorkspace",
-        "title": "AI Rulebook: Remove all rule packs",
+        "command": "aiRules.removeLegacyFoldersWorkspace",
+        "title": "AI Rulebook: Remove legacy per-tool rule folders…",
         "category": "AI Rulebook"
       },
       {
         "command": "aiRules.showCoreStatus",
         "title": "AI Rulebook: Show rule pack status",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.hideRuleColors",
-        "title": "AI Rulebook: Hide rule colors",
-        "category": "AI Rulebook"
-      },
-      {
-        "command": "aiRules.resetWorkspaceRulesToDefaults",
-        "title": "AI Rulebook: Reset rule pack to defaults…",
         "category": "AI Rulebook"
       },
       {
@@ -185,16 +115,6 @@
         }
       ]
     },
-    "submenus": [
-      {
-        "id": "aiRules.syncSubmenu",
-        "label": "Sync rule packs"
-      },
-      {
-        "id": "aiRules.removeSubmenu",
-        "label": "Remove rule packs"
-      }
-    ],
     "menus": {
       "commandPalette": [
         {
@@ -224,89 +144,19 @@
           "group": "2_workspace@1"
         },
         {
-          "command": "aiRules.resetWorkspaceRulesToDefaults",
+          "command": "aiRules.removeWorkspace",
           "when": "view == aiRules.rulesTree",
           "group": "2_workspace@2"
         },
         {
-          "submenu": "aiRules.syncSubmenu",
+          "command": "aiRules.removeLegacyFoldersWorkspace",
           "when": "view == aiRules.rulesTree",
-          "group": "4_sync@1"
-        },
-        {
-          "submenu": "aiRules.removeSubmenu",
-          "when": "view == aiRules.rulesTree",
-          "group": "5_remove@1"
+          "group": "2_workspace@3"
         },
         {
           "command": "aiRules.showCoreStatus",
           "when": "view == aiRules.rulesTree",
           "group": "3_inspect@1"
-        },
-        {
-          "command": "aiRules.hideRuleColors",
-          "when": "view == aiRules.rulesTree",
-          "group": "3_inspect@2"
-        }
-      ],
-      "aiRules.syncSubmenu": [
-        {
-          "command": "aiRules.syncAllFormatsWorkspace",
-          "group": "1_all@1"
-        },
-        {
-          "command": "aiRules.syncCursorWorkspace",
-          "group": "2_format@1"
-        },
-        {
-          "command": "aiRules.syncClineWorkspace",
-          "group": "2_format@2"
-        },
-        {
-          "command": "aiRules.syncOpencodeWorkspace",
-          "group": "2_format@3"
-        },
-        {
-          "command": "aiRules.syncClaudeWorkspace",
-          "group": "2_format@4"
-        },
-        {
-          "command": "aiRules.syncWindsurfWorkspace",
-          "group": "2_format@5"
-        },
-        {
-          "command": "aiRules.syncCopilotWorkspace",
-          "group": "2_format@6"
-        }
-      ],
-      "aiRules.removeSubmenu": [
-        {
-          "command": "aiRules.removeAllFormatsWorkspace",
-          "group": "1_all@1"
-        },
-        {
-          "command": "aiRules.removeCursorWorkspace",
-          "group": "2_format@1"
-        },
-        {
-          "command": "aiRules.removeClineWorkspace",
-          "group": "2_format@2"
-        },
-        {
-          "command": "aiRules.removeOpencodeWorkspace",
-          "group": "2_format@3"
-        },
-        {
-          "command": "aiRules.removeClaudeWorkspace",
-          "group": "2_format@4"
-        },
-        {
-          "command": "aiRules.removeWindsurfWorkspace",
-          "group": "2_format@5"
-        },
-        {
-          "command": "aiRules.removeCopilotWorkspace",
-          "group": "2_format@6"
         }
       ]
     },
@@ -343,72 +193,26 @@
         "aiRules.autoInstallOnOpenWorkspace": {
           "type": "boolean",
           "default": true,
-          "description": "When opening a workspace that has no .cursor/rules/ai-rules folder yet, install the bundled rule pack automatically. Existing rules folders are never overwritten."
-        },
-        "aiRules.installCursorRulesFolder": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "always",
-            "never"
-          ],
-          "enumDescriptions": [
-            "Auto-install .cursor/rules/ai-rules/ only when the host application is Cursor (recommended).",
-            "Always auto-install .cursor/rules/ai-rules/, even in plain VS Code (useful when committing rules for Cursor-using teammates).",
-            "Never auto-install .cursor/rules/ai-rules/. Manual install / reset / sidebar commands still work."
-          ],
-          "default": "auto",
-          "description": "Policy for auto-creating .cursor/rules/ai-rules/ when the folder is missing. Manual commands ignore this setting. Cline mirroring (.clinerules/ai-rules/) is gated separately by aiRules.autoSyncClineWhenInstalled and the Cline-installed check."
-        },
-        "aiRules.colorRulesInExplorer": {
-          "type": "boolean",
-          "default": true,
-          "description": "Tint rule files in VS Code's Explorer: `.mdc` files (active) appear green and `.mdc.disabled` files (off) appear muted gray, anywhere under `.cursor/rules/ai-rules/` in the open workspace."
+          "description": "When opening a workspace that shows signs of AI-agent use (an AGENTS.md, CLAUDE.md, .cursor/, .clinerules/, .opencode/, .windsurf/, or .github/instructions/ entry, or a Cursor host / installed Cline extension) and has no AI Rulebook block in AGENTS.md yet, install the rule pack automatically. Existing text in AGENTS.md is never overwritten."
         },
         "aiRules.promptInstallOnUpdate": {
           "type": "boolean",
           "default": true,
-          "description": "When the extension version changes, offer to refresh workspace rules from the bundled copy."
-        },
-        "aiRules.autoSyncClineWhenInstalled": {
-          "type": "boolean",
-          "default": true,
-          "description": "When Cline is installed, automatically mirror the rule pack into .clinerules/ai-rules/ after install or reset and when Cline is first detected."
-        },
-        "aiRules.autoSyncOpencodeWhenInstalled": {
-          "type": "boolean",
-          "default": true,
-          "description": "When the workspace shows evidence of opencode usage (an AGENTS.md, an opencode.json/opencode.jsonc, or a .opencode/ folder), automatically mirror the rule pack into .opencode/rules/ai-rules/ and register it in the opencode config's instructions array after install or reset."
-        },
-        "aiRules.autoSyncClaudeWhenInstalled": {
-          "type": "boolean",
-          "default": true,
-          "description": "When the workspace shows evidence of Claude Code usage (a CLAUDE.md, a CLAUDE.local.md, or a .claude/ folder), automatically mirror the rule pack into .claude/rules/ai-rules/ after install or reset. Claude Code auto-discovers every .md file under .claude/rules/, so no config file is touched."
-        },
-        "aiRules.autoSyncWindsurfWhenInstalled": {
-          "type": "boolean",
-          "default": true,
-          "description": "When the workspace shows evidence of Windsurf usage (a .windsurf/ folder or a .windsurfrules file), automatically mirror the rule pack into .windsurf/rules/ai-rules/ after install or reset. Windsurf auto-discovers every .md file under .windsurf/rules/, so no config file is touched."
-        },
-        "aiRules.autoSyncCopilotWhenInstalled": {
-          "type": "boolean",
-          "default": true,
-          "description": "When the workspace shows evidence of GitHub Copilot custom-instructions usage (a .github/copilot-instructions.md file or a .github/instructions/ folder), automatically mirror the rule pack into .github/instructions/ai-rules/ after install or reset. Copilot auto-discovers every *.instructions.md file under .github/instructions/, so no config file is touched."
+          "description": "When the extension version changes, offer to refresh the AGENTS.md rule pack from the bundled copy."
         }
       }
     }
   },
   "scripts": {
-    "sync-bundled": "node scripts/sync-bundled.mjs && node scripts/build-rule-packs.mjs",
+    "sync-bundled": "npm run compile && node scripts/sync-bundled.mjs && node scripts/build-standalone.mjs",
     "verify:bundled": "node scripts/verify-bundled.mjs",
     "clean": "node -e \"require('node:fs').rmSync('out', { recursive: true, force: true })\"",
     "compile": "npm run clean && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && npm run verify:bundled && node --test tests/*.test.mjs",
     "test:coverage": "npm run compile && npm run verify:bundled && node --test --experimental-test-coverage tests/*.test.mjs",
-    "vscode:prepublish": "npm run sync-bundled && npm run verify:bundled && npm run compile",
-    "package": "vsce package",
-    "package-rule-packs": "node scripts/package-rule-packs.mjs"
+    "vscode:prepublish": "npm run sync-bundled && npm run verify:bundled",
+    "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

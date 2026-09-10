@@ -38,8 +38,6 @@ describe("readBundleManifest (shipped pack)", () => {
     // `npm run verify:bundled`.
     const bundleDir = path.join(repoRoot, "bundled", "ai-rules");
     const onDisk = (await fs.readdir(bundleDir))
-      .filter((name) => name.endsWith(".mdc") || name.endsWith(".mdc.disabled"))
-      .map((name) => (name.endsWith(".disabled") ? name.slice(0, -".disabled".length) : name))
       .sort((a, b) => a.localeCompare(b));
 
     assert.deepEqual(readBundleManifest(repoRoot).files, onDisk);

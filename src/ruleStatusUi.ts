@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { isRuleEnabled } from "./rulesOperations";
+import { AGENTS_MD, isRuleEnabledInAgentsMd } from "./agentsMd";
 
 export function createAiRulesOutputChannel(): vscode.OutputChannel {
   return vscode.window.createOutputChannel("AI Rulebook");
@@ -14,17 +14,19 @@ export function createAiRulesOutputChannel(): vscode.OutputChannel {
  */
 export async function showRulePackStatusInOutput(
   channel: vscode.OutputChannel,
-  rulesDir: string,
+  workspaceRoot: string,
   mdcs: readonly string[]
 ): Promise<void> {
   channel.clear();
-  channel.appendLine("AI Rulebook — rule pack");
+  channel.appendLine(`AI Rulebook — rule pack in ${AGENTS_MD}`);
   channel.appendLine("(open the AI Rulebook sidebar to see colored on/off state)");
   channel.appendLine("");
   for (const f of mdcs) {
-    const on = await isRuleEnabled(rulesDir, f);
+    const on = await isRuleEnabledInAgentsMd(workspaceRoot, f);
     channel.appendLine(`${on ? "active" : "off   "}\t${f}`);
   }
   channel.appendLine("");
-  channel.appendLine("active = loaded by Cursor; off = `.mdc.disabled` on disk.");
+  channel.appendLine(
+    `active = text present in ${AGENTS_MD}; off = section kept but its text removed.`
+  );
 }

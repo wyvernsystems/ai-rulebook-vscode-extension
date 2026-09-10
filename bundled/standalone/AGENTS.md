@@ -1,56 +1,5 @@
 # AGENTS.md
 
-AI Rulebook is a VS Code extension that installs a rule pack for AI coding
-agents into a project's `AGENTS.md` (one managed block, one section per
-rule) and points Claude Code at it with an `@AGENTS.md` import in
-`CLAUDE.md`. TypeScript sources are in `src/`, tests in `tests/*.test.mjs`
-(`node:test`), build scripts in `scripts/`.
-
-## Commands
-
-```bash
-npm ci               # install the locked development dependencies
-npm test              # compile + verify bundled pack + unit tests
-npm run sync-bundled  # compile, regenerate manifest and bundled/standalone/AGENTS.md after editing a rule
-npm run test:coverage # compile + verify + tests with coverage
-npm run package       # build the VSIX (includes sync-bundled and verification)
-```
-
-Packaging requires Node.js 20 or newer for the locked `@vscode/vsce`; use a
-supported release compatible with the lockfile. `npm test` includes the
-TypeScript check. No linter is configured.
-
-## Rule-editing workflow
-
-- `bundled/ai-rules/*.mdc` is the only editable source of truth for rule
-  text. After changing it, run `npm run sync-bundled` and commit
-  changed generated files (`bundled/manifest.json`,
-  `bundled/standalone/AGENTS.md`, and its README) alongside. Only `.mdc`
-  source files are accepted. The standalone README template is in
-  `scripts/build-standalone.mjs`.
-- The block below between the `ai-rulebook:start` and `ai-rulebook:end`
-  markers is a rendered install of that source (this repo dogfoods its own
-  extension). Never edit it by hand — change the source rule, then re-run
-  **AI Rulebook: Install / update rule pack** in this workspace.
-- Keep the `{{TEST_COMMAND}}` token verbatim in source rules; the extension
-  substitutes the real command at install time.
-
-## Conventions
-
-- Requirements live in [docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md);
-  releases are cut per [docs/RELEASING.md](./docs/RELEASING.md).
-- CI (`.github/workflows/ci.yml`) runs `npm test` on pushes to `main`
-  and all pull requests against Node 18 and 20; keep it green.
-- `src/agentsMd.ts` owns block parsing, rendering, and mutations. It queues
-  mutations per workspace within one extension host. `src/claudeMd.ts` owns
-  import detection and cleanup; `src/rulesOperations.ts` retains legacy
-  folder cleanup, agent-evidence checks, and shared helpers.
-- `src/extension.ts` coordinates activation, commands, and status.
-  `src/sidebarTreeView.ts` owns sidebar rendering and checkbox handling.
-  UI inspection reads `AGENTS.md` through the parsing helpers as well.
-- Keep historical changelog entries and release-note drafts as release
-  history; document current behavior in the README and requirements.
-
 <!-- ai-rulebook:start -->
 <!-- Managed by the AI Rulebook extension. Text between the ai-rulebook markers is regenerated on install; toggle rules from the AI Rulebook sidebar instead of editing here. -->
 
@@ -166,7 +115,7 @@ When editing `.md` files:
 
 - For behavior changes, write the failing tests for the requirement first, then write the code to make them pass.
 - Match the project's existing test file location and naming convention (colocated, mirrored `tests/` folder, feature-grouped, etc.). If none exists, ask when the user is available; working autonomously, default to colocating the test next to the source file it covers using the ecosystem's standard suffix (e.g. `foo.test.ts`, `foo_test.go`).
-- Behavior changes require added or updated unit tests, then run `npm test`.
+- Behavior changes require added or updated unit tests, then run the project's test command.
 - Run the project's existing lint and type checks before reporting done; fix what you introduced. Never add, configure, or disable a linter the project doesn't already use.
 - Never make a test pass by weakening an assertion, skipping or deleting the test, widening a type, or suppressing a lint rule.
 - Report every failing test and every relevant check not run. Never describe an unrun test as passing.

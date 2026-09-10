@@ -6,6 +6,79 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-09-09
+
+### Added
+
+- `AI Rulebook: Remove rule pack` — deletes the managed block from
+  `AGENTS.md` in every open folder, deleting `AGENTS.md` and `CLAUDE.md`
+  when only the default title or whitespace remains in `AGENTS.md` and
+  only removable import lines remain in `CLAUDE.md`. Other user content
+  remains; `CLAUDE.md` cleanup runs only when `AGENTS.md` is deleted.
+- `AI Rulebook: Remove legacy per-tool rule folders…` — deletes the
+  `.cursor/rules/ai-rules/`, `.clinerules/ai-rules/`,
+  `.opencode/rules/ai-rules/` (plus the `/ai-rulebook` command),
+  `.claude/rules/ai-rules/`, `.windsurf/rules/ai-rules/`, and
+  `.github/instructions/ai-rules/` folders written by earlier releases.
+
+### Changed
+
+- **The rule pack now lives in `AGENTS.md`.** `Install / update rule pack`
+  writes one managed block (between `<!-- ai-rulebook:start -->` and
+  `<!-- ai-rulebook:end -->`) into `AGENTS.md`, creating the file or
+  appending to an existing one. Updating an existing block preserves the
+  text outside it; a first install may add separating newlines.
+  Cursor, Cline, opencode, Windsurf, and supported GitHub Copilot features
+  can read that file directly; see the README for tool-specific settings.
+  Install also adds a `@AGENTS.md` import line to `CLAUDE.md`
+  (creating it when missing) so Claude Code sees the same rules.
+- **Toggling a rule edits its section of `AGENTS.md`.** The sidebar
+  checkboxes and the enable / disable commands remove a disabled rule's text
+  (leaving an empty, marked section) and write it back from the bundle when
+  re-enabled. Re-running install keeps each rule's on / off state instead
+  of turning everything back on.
+- **Install applies to every open folder** in a multi-root workspace.
+  Auto-install on open now runs in any folder that already shows signs of
+  AI-agent use (an `AGENTS.md`, `CLAUDE.md`, `.cursor/`, `.clinerules/`,
+  `.opencode/`, `.windsurf/`, or `.github/instructions/` entry, among
+  others), on a Cursor host, or with Cline installed. Otherwise a one-time
+  hint names the install command.
+- Selecting a rule in the sidebar opens `AGENTS.md` at that rule's section.
+  The status bar item now opens `Show rule pack status` and shows a warning
+  when the block's markers are damaged; a damaged block is never rewritten.
+- The standalone download is now a single `bundled/standalone/AGENTS.md`
+  (attached to the GitHub release) instead of a ZIP per tool.
+
+### Removed
+
+- The per-tool mirrors and everything around them: the `Sync rule pack to
+  …` and `Remove … rule pack` commands and their sidebar submenus, `Reset
+  rule pack to defaults…`, `Hide rule colors`, the Explorer file tint, the
+  opencode config and `/ai-rulebook` command edits, and the settings
+  `aiRules.installCursorRulesFolder`, `aiRules.colorRulesInExplorer`, and
+  `aiRules.autoSync{Cline,Opencode,Claude,Windsurf,Copilot}WhenInstalled`.
+  `aiRules.autoInstallOnOpenWorkspace` and `aiRules.promptInstallOnUpdate`
+  remain.
+- The `bundled/rule-packs/` folders and the `package-rule-packs` script.
+
+### Fixed
+
+- Rapid rule toggles and overlapping install/remove actions no longer lose
+  rule changes or corrupt `AGENTS.md` within one extension window.
+- Removing the rule pack preserves `@AGENTS.md` examples inside fenced code
+  blocks in `CLAUDE.md`.
+- Old standalone rule-pack ZIP archives are excluded from the extension
+  package.
+
+### Upgrading
+
+Existing per-tool folders are no longer updated. Run `Install / update rule
+pack` to write `AGENTS.md`, then `Remove legacy per-tool rule folders…` to
+delete the old mirrors. If your opencode config lists
+`.opencode/rules/ai-rules/*.md` under `instructions`, drop that entry by
+hand. Disabled states from legacy folders are not imported; reapply them
+in the new sidebar. Older published releases retain their original layout.
+
 ## [3.1.0] - 2026-08-30
 
 ### Added

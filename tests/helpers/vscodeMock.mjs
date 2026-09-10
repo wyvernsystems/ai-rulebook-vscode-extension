@@ -1,7 +1,6 @@
 export const state = {
   configuration: new Map(),
   installedExtensions: new Set(),
-  workspaceFolderResolver: () => undefined,
   warnings: [],
   errors: [],
   informationMessages: [],
@@ -15,8 +14,8 @@ export const state = {
   quickPickSelection: undefined,
   warningRequests: [],
   warningChoice: undefined,
-  configurationInspections: new Map(),
-  configurationUpdates: [],
+  openedDocuments: [],
+  shownDocuments: [],
 };
 
 export class EventEmitter {
@@ -53,12 +52,6 @@ export class ThemeIcon {
   }
 }
 
-export class MarkdownString {
-  constructor(value = "") {
-    this.value = value;
-  }
-}
-
 export class Uri {
   constructor({ scheme, path = "", fsPath = "" }) {
     this.scheme = scheme;
@@ -72,6 +65,20 @@ export class Uri {
 
   static file(fsPath) {
     return new Uri({ scheme: "file", path: fsPath, fsPath });
+  }
+}
+
+export class Position {
+  constructor(line, character) {
+    this.line = line;
+    this.character = character;
+  }
+}
+
+export class Range {
+  constructor(startLine, startCharacter, endLine, endCharacter) {
+    this.start = new Position(startLine, startCharacter);
+    this.end = new Position(endLine, endCharacter);
   }
 }
 
@@ -145,8 +152,6 @@ class StatusBarItem {
     state.statusBarItems.push(this);
   }
 
-  hide() {}
-
   dispose() {}
 }
 
@@ -160,53 +165,29 @@ export const env = {
   appName: "Visual Studio Code",
 };
 
-export const ConfigurationTarget = {
-  Global: 1,
-  Workspace: 2,
-  WorkspaceFolder: 3,
-};
-
 export const workspace = {
   workspaceFolders: undefined,
 
-  getConfiguration(section, resource) {
+  getConfiguration(section) {
     return {
       get(key, defaultValue) {
         const value = state.configuration.get(`${section}.${key}`);
         return value === undefined ? defaultValue : value;
       },
 
-      inspect(key) {
-        return state.configurationInspections.get(`${section}.${key}`);
-      },
-
-      async update(key, value, target) {
-        state.configurationUpdates.push({ section, key, value, target, resource });
-        state.configuration.set(`${section}.${key}`, value);
-      },
     };
   },
 
-  getWorkspaceFolder(uri) {
-    return state.workspaceFolderResolver(uri);
-  },
-
-  onDidChangeConfiguration() {
-    return { dispose() {} };
-  },
-
-  onDidChangeWorkspaceFolders() {
-    return { dispose() {} };
+  async openTextDocument(fsPath) {
+    const document = { uri: Uri.file(fsPath), fileName: fsPath };
+    state.openedDocuments.push(document);
+    return document;
   },
 };
 
 export const extensions = {
   getExtension(id) {
     return state.installedExtensions.has(id) ? { id } : undefined;
-  },
-
-  onDidChange() {
-    return { dispose() {} };
   },
 };
 
@@ -257,6 +238,10 @@ export const window = {
   async showInformationMessage(message) {
     state.informationMessages.push(message);
   },
+
+  async showTextDocument(document, options) {
+    state.shownDocuments.push({ document, options });
+  },
 };
 
 export const commands = {
@@ -275,7 +260,6 @@ export const commands = {
 export function resetVscodeMock() {
   state.configuration.clear();
   state.installedExtensions.clear();
-  state.workspaceFolderResolver = () => undefined;
   state.warnings = [];
   state.errors = [];
   state.informationMessages = [];
@@ -289,17 +273,17 @@ export function resetVscodeMock() {
   state.quickPickSelection = undefined;
   state.warningRequests = [];
   state.warningChoice = undefined;
-  state.configurationInspections.clear();
-  state.configurationUpdates = [];
+  state.openedDocuments = [];
+  state.shownDocuments = [];
   workspace.workspaceFolders = undefined;
   env.uriScheme = "vscode";
   env.appName = "Visual Studio Code";
 }
 
 export const vscode = {
-  ConfigurationTarget,
   EventEmitter,
-  MarkdownString,
+  Position,
+  Range,
   StatusBarAlignment,
   ThemeColor,
   ThemeIcon,

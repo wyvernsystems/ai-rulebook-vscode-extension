@@ -23,7 +23,7 @@ ai-rulebook-rules-*.zip
 icon-source.png
 docs/**
 .github-release-notes-*.md
-bundled/rule-packs/**
+bundled/standalone/**
 !bundled/ai-rules/**
 !bundled/manifest.json
 !out/**
@@ -31,3 +31,5 @@ bundled/rule-packs/**
 !LICENSE
 !README.md
 !CHANGELOG.md
+CLAUDE.md
+AGENTS.md

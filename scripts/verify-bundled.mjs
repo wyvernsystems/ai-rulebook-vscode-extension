@@ -5,11 +5,8 @@
  * `bundled/ai-rules/`, every rule has usable frontmatter, and no rule carries
  * a placeholder the extension cannot render.
  *
- * This deliberately does not compare against `.cursor/rules/ai-rules/`. That
- * folder is a generated install — gitignored, absent on a fresh clone, and
- * rendered per project, so it cannot be byte-identical to the source.
- *
- * Runs before `compile`, so it must not import anything from `out/`.
+ * Workspace `AGENTS.md` is a rendered install and is not compared with the
+ * source. This script runs independently of compiled extension code.
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -66,33 +63,24 @@ if (!Array.isArray(manifest.files)) {
 
 const problems = [];
 
-/** Logical path for a rule: `x.mdc.disabled` and `x.mdc` are the same rule. */
-const toLogical = (rel) =>
-  rel.endsWith(".mdc.disabled") ? rel.slice(0, -".disabled".length) : rel;
-
-const onDisk = walkFiles(bundleDir);
-const ruleFiles = onDisk.filter(
-  (rel) => rel.endsWith(".mdc") || rel.endsWith(".mdc.disabled")
-);
-const otherFiles = onDisk.filter((rel) => !ruleFiles.includes(rel));
-
+const ruleFiles = walkFiles(bundleDir).sort((a, b) => a.localeCompare(b));
+const unsupported = ruleFiles.filter((rel) => !rel.endsWith(".mdc"));
+if (unsupported.length > 0) {
+  fail(`Unsupported bundled files (expected .mdc rules): ${unsupported.join(", ")}`);
+}
 if (ruleFiles.length === 0) {
   fail(`No .mdc rules found in ${bundleDir}`);
 }
 
-const expected = [
-  ...otherFiles.sort((a, b) => a.localeCompare(b)),
-  ...[...new Set(ruleFiles.map(toLogical))].sort((a, b) => a.localeCompare(b)),
-];
 const listed = manifest.files;
 
-for (const rel of expected) {
+for (const rel of ruleFiles) {
   if (!listed.includes(rel)) {
     problems.push(`present in bundled/ai-rules but missing from the manifest: ${rel}`);
   }
 }
 for (const rel of listed) {
-  if (!expected.includes(rel)) {
+  if (!ruleFiles.includes(rel)) {
     problems.push(`listed in the manifest but not in bundled/ai-rules: ${rel}`);
   }
 }
@@ -121,7 +109,4 @@ if (problems.length) {
   process.exit(1);
 }
 
-console.log(
-  `OK: bundled rule pack is consistent (${new Set(ruleFiles.map(toLogical)).size} rules,`,
-  `${otherFiles.length} other files).`
-);
+console.log(`OK: bundled rule pack is consistent (${ruleFiles.length} rules).`);

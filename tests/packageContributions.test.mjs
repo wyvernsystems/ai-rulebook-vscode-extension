@@ -35,12 +35,38 @@ describe("VS Code package contributions", () => {
     }
   });
 
-  test("contributes manual sync and remove commands for every supported format", () => {
+  test("contributes install, remove, legacy-cleanup, and status commands", () => {
     const commandIds = new Set(
       contributions.commands.map((command) => command.command)
     );
 
     for (const command of [
+      "aiRules.installWorkspace",
+      "aiRules.removeWorkspace",
+      "aiRules.removeLegacyFoldersWorkspace",
+      "aiRules.showCoreStatus",
+      "aiRules.refreshTree",
+      "aiRules.revealRuleFile",
+    ]) {
+      assert.ok(commandIds.has(command), `missing command: ${command}`);
+    }
+  });
+
+  test("sidebar toolbar menus are not gated by host application", () => {
+    for (const item of contributions.menus["view/title"]) {
+      const when = item.when ?? "";
+      assert.ok(!/cursor|vscode|isCursor|isVscode/i.test(when), `unexpected host gate: ${JSON.stringify(item)}`);
+    }
+  });
+
+  test("does not contribute obsolete multi-rule commands", () => {
+    const commandIds = contributions.commands.map((command) => command.command);
+    const removedCommands = [
+      "aiRules.enableAllGlobal",
+      "aiRules.disableAllGlobal",
+      "aiRules.applyGlobalToWorkspace",
+      "aiRules.toggleIndividualRule",
+      // Per-tool folder mirrors were replaced by the AGENTS.md block.
       "aiRules.syncCursorWorkspace",
       "aiRules.syncClineWorkspace",
       "aiRules.syncOpencodeWorkspace",
@@ -55,34 +81,30 @@ describe("VS Code package contributions", () => {
       "aiRules.removeWindsurfWorkspace",
       "aiRules.removeCopilotWorkspace",
       "aiRules.removeAllFormatsWorkspace",
-    ]) {
-      assert.ok(commandIds.has(command), `missing format command: ${command}`);
-    }
-  });
-
-  test("sync and remove sidebar menus are not gated by host application", () => {
-    const syncMenu = contributions.menus["aiRules.syncSubmenu"] ?? [];
-    const removeMenu = contributions.menus["aiRules.removeSubmenu"] ?? [];
-    const toolbarSubmenus = contributions.menus["view/title"].filter((item) => item.submenu);
-
-    for (const item of [...syncMenu, ...removeMenu, ...toolbarSubmenus]) {
-      const when = item.when ?? "";
-      assert.ok(!/cursor|vscode|isCursor|isVscode/i.test(when), `unexpected host gate: ${JSON.stringify(item)}`);
-    }
-  });
-
-  test("does not contribute obsolete multi-rule commands", () => {
-    const commandIds = contributions.commands.map((command) => command.command);
-    const removedCommands = [
-      "aiRules.enableAllGlobal",
-      "aiRules.disableAllGlobal",
-      "aiRules.applyGlobalToWorkspace",
-      "aiRules.toggleIndividualRule",
+      "aiRules.resetWorkspaceRulesToDefaults",
+      "aiRules.hideRuleColors",
     ];
 
     assert.ok(commandIds.every((command) => !command.startsWith("aiRules.mode")));
     for (const command of removedCommands) {
-      assert.ok(!commandIds.includes(command));
+      assert.ok(!commandIds.includes(command), `obsolete command still contributed: ${command}`);
+    }
+    assert.equal(contributions.submenus, undefined, "per-tool submenus were removed");
+  });
+
+  test("does not contribute obsolete per-tool settings", () => {
+    const properties = contributions.configuration.properties;
+
+    for (const settingId of [
+      "aiRules.installCursorRulesFolder",
+      "aiRules.colorRulesInExplorer",
+      "aiRules.autoSyncClineWhenInstalled",
+      "aiRules.autoSyncOpencodeWhenInstalled",
+      "aiRules.autoSyncClaudeWhenInstalled",
+      "aiRules.autoSyncWindsurfWhenInstalled",
+      "aiRules.autoSyncCopilotWhenInstalled",
+    ]) {
+      assert.equal(properties[settingId], undefined, `obsolete setting still contributed: ${settingId}`);
     }
   });
 
@@ -132,26 +154,14 @@ describe("VS Code package contributions", () => {
     assert.equal(inactive.defaults.highContrast, "#F85149");
   });
 
-  test("Cursor install policy contribution matches runtime-supported values", () => {
-    const policy =
-      contributions.configuration.properties["aiRules.installCursorRulesFolder"];
-
-    assert.deepEqual(policy.enum, ["auto", "always", "never"]);
-    assert.equal(policy.default, "auto");
-  });
-
   test("boolean settings declare boolean defaults", () => {
     const properties = contributions.configuration.properties;
     const booleanSettingIds = [
       "aiRules.autoInstallOnOpenWorkspace",
-      "aiRules.colorRulesInExplorer",
       "aiRules.promptInstallOnUpdate",
-      "aiRules.autoSyncClineWhenInstalled",
-      "aiRules.autoSyncOpencodeWhenInstalled",
-      "aiRules.autoSyncClaudeWhenInstalled",
-      "aiRules.autoSyncWindsurfWhenInstalled",
-      "aiRules.autoSyncCopilotWhenInstalled",
     ];
+
+    assert.deepEqual(Object.keys(properties).sort(), [...booleanSettingIds].sort());
 
     for (const settingId of booleanSettingIds) {
       assert.equal(properties[settingId].type, "boolean", `${settingId} type`);
