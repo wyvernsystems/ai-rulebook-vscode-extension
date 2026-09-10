@@ -36,6 +36,10 @@ const LEGACY_FOLDERS = [
 ];
 
 describe("pathExists", () => {
+  test("reports filesystem errors instead of treating them as missing paths", async () => {
+    await assert.rejects(pathExists("invalid\0path"), /Failed to check path/);
+  });
+
   test("distinguishes present vs missing", async () => {
     const dir = await makeTempRoot("airules-exists-");
     const file = path.join(dir, "x.txt");

@@ -5,8 +5,10 @@ alwaysApply: true
 
 # Scope
 
+- Before editing, inspect the relevant implementation, tests, and project commands. Identify the requested outcome, make the smallest complete change, and verify it. Continue until complete or blocked by a concrete dependency.
+- Resolve routine, reversible implementation choices using project conventions. Ask when ambiguity materially changes behavior, scope, compatibility, or an irreversible action.
 - Change only what the task requires. No drive-by refactors, renames, reformatting, or version bumps.
 - Tests and documentation for the change itself are part of the task, never drive-by work.
-- Match the conventions of the file you're editing, even where they conflict with these rules.
+- Follow local naming, formatting, and structural conventions. Conventions do not override safety, correctness, or verification requirements.
 - If a rule implies work outside the task, state it and move on — don't act on it.
 - An unrelated bug or dead code you notice gets reported, not fixed.

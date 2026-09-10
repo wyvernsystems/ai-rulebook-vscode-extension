@@ -521,3 +521,52 @@ describe("ruleSectionLine", () => {
     });
   });
 });
+
+describe("rule file error handling", () => {
+  test("rejects reversed and mismatched markers", () => {
+    assert.throws(() => parseAgentsMd(`${AGENTS_MD_BLOCK_END}\n${AGENTS_MD_BLOCK_START}\n`), /before/);
+    for (const body of [
+      ruleEndMarker("code"),
+      `${ruleStartMarker("code", true)}\n${ruleEndMarker("docs")}`,
+      `${ruleStartMarker("code", true)}\n${ruleStartMarker("docs", true)}`,
+    ]) {
+      assert.throws(() => parseAgentsMd(`${AGENTS_MD_BLOCK_START}\n${body}\n${AGENTS_MD_BLOCK_END}\n`), /marker/);
+    }
+  });
+
+  test("reports an unreadable AGENTS.md without changing it", async () => {
+    await withFixture(async ({ root, file }) => {
+      await fs.mkdir(file);
+      await assert.rejects(hasRulesBlock(root), /Failed to read AGENTS\.md/);
+      assert.equal((await fs.stat(file)).isDirectory(), true);
+    });
+  });
+
+  test("reports a write failure when the workspace disappears", async () => {
+    await withFixture(async ({ root, bundle }) => {
+      await fs.rmdir(root);
+      await assert.rejects(installRulesIntoAgentsMd(root, bundle, RULE_FILES, null), /Failed to write AGENTS\.md/);
+    });
+  });
+
+  test("reads every bundled rule before overwriting installed rules", async () => {
+    await withFixture(async ({ root, bundle, file }) => {
+      await installRulesIntoAgentsMd(root, bundle, RULE_FILES, null);
+      const original = await fs.readFile(file, "utf8");
+      await fs.unlink(path.join(bundle, "tests.mdc"));
+      await fs.mkdir(path.join(bundle, "tests.mdc"));
+      await assert.rejects(installRulesIntoAgentsMd(root, bundle, RULE_FILES, null), /Failed to read bundled rule tests\.mdc/);
+      assert.equal(await fs.readFile(file, "utf8"), original);
+    });
+  });
+
+  test("installs into an empty file without adding a title", async () => {
+    await withFixture(async ({ root, bundle, file }) => {
+      await fs.writeFile(file, " \n\t");
+      await installRulesIntoAgentsMd(root, bundle, RULE_FILES, null);
+      const text = await fs.readFile(file, "utf8");
+      assert.ok(text.startsWith(AGENTS_MD_BLOCK_START));
+      assert.equal(parseAgentsMd(text).rules.length, RULE_FILES.length);
+    });
+  });
+});

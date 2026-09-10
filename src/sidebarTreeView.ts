@@ -114,13 +114,13 @@ export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
   private async ruleTreeItem(node: RuleItem): Promise<vscode.TreeItem> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     let enabled = false;
+    let readError: string | undefined;
     if (root) {
       try {
         enabled = await isRuleEnabledInAgentsMd(root, node.ruleFile);
-      } catch {
-        // A damaged block is reported by the extension on activation; here
-        // the rule simply shows as off rather than breaking the whole tree.
-        enabled = false;
+      } catch (e) {
+        const reason = e instanceof Error ? e.message : String(e);
+        readError = `Unable to read ${AGENTS_MD} in ${root}: ${reason}`;
       }
     }
     const label = node.ruleFile
@@ -151,6 +151,14 @@ export class RulesTreeProvider implements vscode.TreeDataProvider<Node> {
       title: "Open rule section",
       arguments: [node.ruleFile],
     };
+    if (readError !== undefined) {
+      item.description = "Unable to read";
+      item.tooltip = readError;
+      item.checkboxState = undefined;
+      item.resourceUri = undefined;
+      item.iconPath = new vscode.ThemeIcon("warning");
+      item.accessibilityInformation = { label: `${label}, ${readError}` };
+    }
     return item;
   }
 }

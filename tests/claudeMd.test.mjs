@@ -126,3 +126,20 @@ describe("removeAgentsMdImport", () => {
     });
   });
 });
+
+describe("CLAUDE.md filesystem failures", () => {
+  test("reports a read failure without replacing the path", async () => {
+    await withRoot(async (root, file) => {
+      await fs.mkdir(file);
+      await assert.rejects(ensureAgentsMdImport(root), /Failed to read CLAUDE\.md/);
+      assert.equal((await fs.stat(file)).isDirectory(), true);
+    });
+  });
+
+  test("reports a write failure in a missing workspace", async () => {
+    await withRoot(async (root) => {
+      await fs.rmdir(root);
+      await assert.rejects(ensureAgentsMdImport(root), /Failed to write CLAUDE\.md/);
+    });
+  });
+});

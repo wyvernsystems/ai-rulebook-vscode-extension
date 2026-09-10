@@ -10,7 +10,7 @@ async function withBundle(run) {
   try {
     await fs.mkdir(path.join(root, "scripts"));
     await fs.mkdir(path.join(root, "bundled", "ai-rules"), { recursive: true });
-    for (const script of ["sync-bundled.mjs", "verify-bundled.mjs"]) {
+    for (const script of ["sync-bundled.mjs", "verify-bundled.mjs", "build-standalone.mjs"]) {
       await fs.copyFile(new URL(`../scripts/${script}`, import.meta.url), path.join(root, "scripts", script));
     }
     await fs.writeFile(path.join(root, "bundled", "ai-rules", "code.mdc"),
@@ -22,6 +22,18 @@ async function withBundle(run) {
     await fs.rm(root, { recursive: true, force: true });
   }
 }
+
+test("build-standalone.mjs validates the manifest before writing output", async () => {
+  await withBundle(async (root) => {
+    await fs.cp(new URL("../out/", import.meta.url), path.join(root, "out"), { recursive: true });
+    await fs.writeFile(path.join(root, "bundled", "manifest.json"),
+      JSON.stringify({ version: 0, files: ["code.mdc"] }));
+    const result = spawnSync(process.execPath, [path.join(root, "scripts", "build-standalone.mjs")], { encoding: "utf8" });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stderr, /Manifest has invalid `version`/);
+    await assert.rejects(fs.access(path.join(root, "bundled", "standalone")), { code: "ENOENT" });
+  });
+});
 
 for (const script of ["sync-bundled.mjs", "verify-bundled.mjs"]) {
   test(`${script} accepts a bundle containing only .mdc rules`, async () => {

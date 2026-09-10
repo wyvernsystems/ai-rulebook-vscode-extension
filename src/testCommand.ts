@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { pathExists } from "./rulesOperations";
 
 /**
  * Token used in bundled rule text wherever the project's own test command
@@ -38,17 +39,12 @@ const PYTEST_CONFIG_FILES = [
 async function readTextFile(file: string): Promise<string | null> {
   try {
     return await fs.readFile(file, "utf8");
-  } catch {
-    return null;
-  }
-}
-
-async function fileExists(file: string): Promise<boolean> {
-  try {
-    await fs.access(file);
-    return true;
-  } catch {
-    return false;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    const reason = e instanceof Error ? e.message : String(e);
+    throw new Error(`Failed to read ${file}: ${reason}`, { cause: e });
   }
 }
 
@@ -78,7 +74,7 @@ async function detectNodeTestCommand(workspaceRoot: string): Promise<string | nu
     return null;
   }
   for (const [lockfile, runner] of LOCKFILE_RUNNERS) {
-    if (await fileExists(path.join(workspaceRoot, lockfile))) {
+    if (await pathExists(path.join(workspaceRoot, lockfile))) {
       return `${runner} test`;
     }
   }
@@ -87,7 +83,7 @@ async function detectNodeTestCommand(workspaceRoot: string): Promise<string | nu
 
 async function detectMarkerFileTestCommand(workspaceRoot: string): Promise<string | null> {
   for (const [marker, command] of MARKER_FILE_COMMANDS) {
-    if (await fileExists(path.join(workspaceRoot, marker))) {
+    if (await pathExists(path.join(workspaceRoot, marker))) {
       return command;
     }
   }

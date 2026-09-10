@@ -60,8 +60,12 @@ export async function pathExists(p: string): Promise<boolean> {
   try {
     await fs.access(p);
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+      return false;
+    }
+    const reason = e instanceof Error ? e.message : String(e);
+    throw new Error(`Failed to check path ${p}: ${reason}`, { cause: e });
   }
 }
 

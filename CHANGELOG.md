@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-09-09
+
+### Changed
+
+- Refined the existing rules with task-completion guidance, protection for
+  existing work, behavior-focused tests, and final verification. Simplified
+  documentation guidance and clarified conventions, dependency checks, and
+  error handling while preserving all six rules and their toggles.
+
+### Fixed
+
+- Unreadable rule files now show an error in the sidebar instead of appearing
+  disabled. Filesystem failures during project detection and legacy cleanup
+  are reported instead of being treated as missing files.
+
 ## [4.0.0] - 2026-09-09
 
 ### Added

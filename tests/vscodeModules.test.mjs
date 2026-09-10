@@ -201,6 +201,19 @@ describe("RulesTreeProvider", () => {
     assert.equal(item.checkboxState, TreeItemCheckboxState.Unchecked);
   });
 
+  test("getTreeItem exposes a damaged block without claiming the rule is disabled", async (t) => {
+    const [root] = await tempWorkspaces(t, 1);
+    workspace.workspaceFolders = [{ uri: Uri.file(root) }];
+    await writeFile(path.join(root, "AGENTS.md"), agentsMd.AGENTS_MD_BLOCK_START + "\n");
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
+    const item = await provider.getTreeItem({ kind: "rule", ruleFile: SAMPLE_RULE });
+    assert.equal(item.description, "Unable to read");
+    assert.match(item.tooltip, /AGENTS\.md/);
+    assert.equal(item.checkboxState, undefined);
+    assert.equal(item.resourceUri, undefined);
+    assert.equal(item.iconPath.id, "warning");
+  });
+
   test("refresh notifies tree listeners and registered callbacks", () => {
     const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
     const treeEvents = [];
@@ -784,6 +797,115 @@ describe("update prompt", () => {
     await extension.activate(context);
 
     assert.ok(state.informationMessages.some((message) => /updated to v1\.4\.0/.test(message)));
+    assert.equal(values.get("aiRules.lastSeenExtensionVersion"), "1.4.0");
+  });
+});
+
+describe("command and UI edge cases", () => {
+  test("sidebar has no children without a workspace and ignores unknown decoration paths", async () => {
+    const provider = new sidebarTreeView.RulesTreeProvider(RULE_FILES);
+    assert.deepEqual(await provider.getChildren(), []);
+    const colors = new sidebarTreeView.RuleStatusDecorationProvider();
+    assert.equal(colors.provideFileDecoration(Uri.from({ scheme: "ai-rules-status", path: "/unknown/code.mdc" })), undefined);
+  });
+
+  for (const files of [[], ["notes.md"]]) {
+    test(`activation rejects unusable manifest files ${JSON.stringify(files)}`, async (t) => {
+      const [root] = await tempWorkspaces(t, 1);
+      await writeFile(path.join(root, "bundled", "manifest.json"), JSON.stringify({ version: 1, files }));
+      const { context } = makeExtensionContext(root);
+      await extension.activate(context);
+      assert.equal(state.registeredCommands.size, 0);
+      assert.equal(state.errors.length, 1);
+      assert.match(state.errors[0], /at least one .mdc rule/);
+    });
+  }
+
+  test("cancelling a rule picker preserves the file and emits no success message", async (t) => {
+    const [root] = await tempWorkspaces(t, 1);
+    await installPack(root);
+    await activateIn([root]);
+    const original = await readAgentsMd(root);
+    state.informationMessages = [];
+    await state.registeredCommands.get("aiRules.disableRuleWorkspace")();
+    assert.equal(await readAgentsMd(root), original);
+    assert.deepEqual(state.informationMessages, []);
+    assert.deepEqual(state.errors, []);
+  });
+
+  test("cancelling legacy cleanup preserves old rule files", async (t) => {
+    const [root] = await tempWorkspaces(t, 1);
+    const file = path.join(root, ".cursor", "rules", "ai-rules", "code.mdc");
+    await writeFile(file, "old rules\n");
+    await activateIn([root]);
+    await state.registeredCommands.get("aiRules.removeLegacyFoldersWorkspace")();
+    assert.equal(await fs.readFile(file, "utf8"), "old rules\n");
+    assert.deepEqual(state.errors, []);
+  });
+
+  test("removing an absent pack reports nothing removed and preserves user text", async (t) => {
+    const [root] = await tempWorkspaces(t, 1);
+    await writeFile(agentsMd.agentsMdPath(root), "# Project\n");
+    await activateIn([root]);
+    state.warningChoice = "Remove rule pack";
+    await state.registeredCommands.get("aiRules.removeWorkspace")();
+    assert.equal(await readAgentsMd(root), "# Project\n");
+    assert.ok(state.informationMessages.some((message) => /nothing removed/.test(message)));
+  });
+
+  test("refresh reads external changes and reports unreadable AGENTS.md", async (t) => {
+    const [root] = await tempWorkspaces(t, 1);
+    await installPack(root);
+    await activateIn([root]);
+    await agentsMd.setRuleEnabledInAgentsMd(root, bundleDir, SAMPLE_RULE, false, null);
+    await state.registeredCommands.get("aiRules.refreshTree")();
+    assert.match(state.statusBarItems[0].text, /AI 5\/6/);
+    await fs.unlink(agentsMd.agentsMdPath(root));
+    await fs.mkdir(agentsMd.agentsMdPath(root));
+    await state.registeredCommands.get("aiRules.refreshTree")();
+    assert.match(state.statusBarItems[0].text, /warning/);
+    assert.match(state.statusBarItems[0].tooltip, /Failed to read AGENTS\.md/);
+  });
+
+  test("auto-install continues to the next workspace after a project-file read failure", async (t) => {
+    const roots = await tempWorkspaces(t, 3);
+    workspace.workspaceFolders = roots.map((root) => ({ uri: Uri.file(root) }));
+    vscode.env.uriScheme = "cursor";
+    await fs.mkdir(path.join(roots[0], "package.json"));
+    const { context } = makeExtensionContext(repoRoot);
+    await extension.activate(context);
+    assert.equal(await agentsMd.hasRulesBlock(roots[0]), false);
+    for (const root of roots.slice(1)) assert.equal(await agentsMd.hasRulesBlock(root), true);
+    assert.equal(state.errors.length, 1);
+    assert.match(state.errors[0], /auto-install.*failed.*package\.json/);
+    assert.ok(state.informationMessages.some((message) => /in 2 folders/.test(message)));
+  });
+
+  test("accepting an update prompt refreshes rules while preserving disabled state", async (t) => {
+    const [root] = await tempWorkspaces(t, 1);
+    await installPack(root, "old test");
+    await agentsMd.setRuleEnabledInAgentsMd(root, bundleDir, "git.mdc", false, null);
+    await writeFile(path.join(root, "go.mod"), "module example\n");
+    workspace.workspaceFolders = [{ uri: Uri.file(root) }];
+    const { context, values } = makeExtensionContext(repoRoot);
+    values.set("aiRules.lastSeenExtensionVersion", "1.0.0");
+    t.mock.method(vscode.window, "showInformationMessage", async () => "Install / update in workspace");
+    await extension.activate(context);
+    assert.ok(state.executedCommands.some(([id]) => id === "aiRules.installWorkspace"));
+    assert.match(await readAgentsMd(root), /`go test \.\/\.\.\.`/);
+    assert.equal(await agentsMd.isRuleEnabledInAgentsMd(root, "git.mdc"), false);
+    assert.equal(values.get("aiRules.lastSeenExtensionVersion"), "1.4.0");
+  });
+
+  test("disabled update prompts record the version without asking to refresh", async (t) => {
+    const [root] = await tempWorkspaces(t, 1);
+    workspace.workspaceFolders = [{ uri: Uri.file(root) }];
+    state.configuration.set("aiRules.autoInstallOnOpenWorkspace", false);
+    state.configuration.set("aiRules.promptInstallOnUpdate", false);
+    const { context, values } = makeExtensionContext(repoRoot);
+    values.set("aiRules.lastSeenExtensionVersion", "1.0.0");
+    await extension.activate(context);
+    assert.deepEqual(state.informationMessages, []);
     assert.equal(values.get("aiRules.lastSeenExtensionVersion"), "1.4.0");
   });
 });

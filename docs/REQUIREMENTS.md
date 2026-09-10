@@ -142,6 +142,15 @@ details belong in the code or in the rule files.
   relative path matching `^[A-Za-z0-9_./-]+$`, with no `..` segments, no
   leading `/` or `./`, and ≤ 200 chars. A malformed manifest aborts
   activation with a clear error.
+- Standalone bundle generation uses the same manifest validator before
+  writing generated files.
+- Filesystem failures during test-command detection, agent-evidence checks,
+  and legacy cleanup must include the affected path; only missing files are
+  treated as absent. An unparseable `package.json` remains inconclusive for
+  test-command detection.
+- When the sidebar cannot read or parse `AGENTS.md`, affected rules show
+  `Unable to read` with the error in the tooltip and no checkbox, instead of
+  claiming they are disabled.
 - **Path containment** is asserted on every operation that resolves a
   manifest entry under the bundle directory. Out-of-tree paths must throw
   before any filesystem call, and every bundled rule is read before

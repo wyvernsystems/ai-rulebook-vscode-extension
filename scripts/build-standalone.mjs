@@ -22,7 +22,8 @@ const outDir = path.join(repoRoot, "bundled", "standalone");
 const { installRulesIntoAgentsMd, agentsMdPath } = await import(
   path.join(repoRoot, "out", "agentsMd.js")
 );
-const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "bundled", "manifest.json"), "utf8"));
+const { readBundleManifest } = await import(path.join(repoRoot, "out", "manifest.js"));
+const manifest = readBundleManifest(repoRoot);
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ai-rulebook-standalone-"));
 try {

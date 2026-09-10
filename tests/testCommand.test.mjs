@@ -38,6 +38,20 @@ const packageJsonWithTest = JSON.stringify({
 });
 
 describe("detectTestCommand — Node", () => {
+  test("reports unreadable project files with their path", async () => {
+    await withRoot({}, async (root) => {
+      await fs.mkdir(path.join(root, "package.json"));
+      await assert.rejects(detectTestCommand(root), /Failed to read .*package\.json/);
+    });
+  });
+
+  test("reports lockfile access errors", async () => {
+    await withRoot({ "package.json": packageJsonWithTest }, async (root) => {
+      await fs.symlink("pnpm-lock.yaml", path.join(root, "pnpm-lock.yaml"));
+      await assert.rejects(detectTestCommand(root), /Failed to check path .*pnpm-lock\.yaml/);
+    });
+  });
+
   test("uses npm when a test script exists with no lockfile", async () => {
     await withRoot({ "package.json": packageJsonWithTest }, async (root) => {
       assert.equal(await detectTestCommand(root), "npm test");
@@ -161,4 +175,22 @@ describe("renderRuleBody", () => {
   test("leaves a body without placeholders untouched", () => {
     assert.equal(renderRuleBody("# Scope\n", "npm test"), "# Scope\n");
   });
+});
+
+describe("test command detection edge cases", () => {
+  for (const contents of ["null", "42", '{"scripts":null}', '{"scripts":"test"}', '{"scripts":{"test":false}}', '{"scripts":{"test":"  "}}']) {
+    test(`falls back to Makefile for package.json ${contents}`, async () => {
+      await withRoot({ "package.json": contents, Makefile: "test:\n\t./run\n" }, async (root) => {
+        assert.equal(await detectTestCommand(root), "make test");
+      });
+    });
+  }
+
+  for (const [name, contents] of [["setup.cfg", "[tool:pytest]\n"], ["tox.ini", "[pytest]\n"]]) {
+    test(`recognizes pytest in ${name}`, async () => {
+      await withRoot({ [name]: contents }, async (root) => {
+        assert.equal(await detectTestCommand(root), "pytest");
+      });
+    });
+  }
 });
