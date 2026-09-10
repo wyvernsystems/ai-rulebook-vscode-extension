@@ -14,6 +14,8 @@ All notable changes to this project are documented here. The format follows
   existing work, behavior-focused tests, and final verification. Simplified
   documentation guidance and clarified conventions, dependency checks, and
   error handling while preserving all six rules and their toggles.
+- The Tests rule recommends a suitable linter when none is configured and
+  allows adding or configuring it when requested or approved.
 
 ### Fixed
 

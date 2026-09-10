@@ -124,7 +124,8 @@ normalize blank lines around the former block.
   protect secrets, and preserve error causes with actionable context.
 - **`tests.mdc`** — test observable behavior at the appropriate level,
   reproduce bugs with regression tests when feasible, run project tests and
-  existing lint/type checks, preserve valid coverage, inspect the final diff,
+  existing lint/type checks, recommend a suitable linter when absent and add
+  it only when requested or approved, preserve valid coverage, inspect the final diff,
   and report verification results and blockers accurately.
 - **`docs.mdc`** — update documentation made inaccurate by the change,
   follow the project's layout, add user-facing release notes when appropriate,

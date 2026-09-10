@@ -8,7 +8,7 @@ alwaysApply: true
 - For behavior changes, add or update a test at the level that exercises the requirement. For bug fixes, first reproduce the failure with a regression test when feasible. Test observable behavior rather than implementation details.
 - Match the project's existing test file location and naming convention. If none exists, colocate tests with the source using the ecosystem's standard suffix (e.g. `foo.test.ts`, `foo_test.go`).
 - After behavior changes, run {{TEST_COMMAND}}.
-- Run the project's existing lint and type checks before reporting done; fix what you introduced. Never add, configure, or disable a linter the project doesn't already use.
+- Run the project's existing lint and type checks before reporting done; fix what you introduced. If no linter is configured, recommend one suited to the project and explain its benefit. Add or configure it only when requested or approved. Never disable lint checks merely to obtain a pass.
 - Do not weaken checks merely to obtain a pass. When a requirement intentionally changes, update obsolete expectations and explain the change. Preserve coverage of behavior that remains required.
 - Before reporting completion, inspect the final diff for unintended changes, debug code, secrets, and missing generated artifacts.
 - State what changed, which checks ran and their results, and any remaining blockers. Report every failing test and every relevant check not run. Distinguish observed results from assumptions; never describe an unrun test as passing.
