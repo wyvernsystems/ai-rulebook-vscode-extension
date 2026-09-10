@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-09-09
+
+### Changed
+
+- The Tests rule recommends a suitable linter when none is configured and
+  allows adding or configuring it when requested or approved.
+
+### Fixed
+
+- Wrapped filesystem and manifest errors preserve their original cause for
+  troubleshooting.
+
 ## [4.1.0] - 2026-09-09
 
 ### Changed
@@ -14,16 +26,12 @@ All notable changes to this project are documented here. The format follows
   existing work, behavior-focused tests, and final verification. Simplified
   documentation guidance and clarified conventions, dependency checks, and
   error handling while preserving all six rules and their toggles.
-- The Tests rule recommends a suitable linter when none is configured and
-  allows adding or configuring it when requested or approved.
 
 ### Fixed
 
 - Unreadable rule files now show an error in the sidebar instead of appearing
   disabled. Filesystem failures during project detection and legacy cleanup
   are reported instead of being treated as missing files.
-- Wrapped filesystem and manifest errors preserve their original cause for
-  troubleshooting.
 
 ## [4.0.0] - 2026-09-09
 

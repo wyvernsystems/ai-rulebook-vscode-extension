@@ -2,7 +2,7 @@
   "name": "ai-rulebook",
   "displayName": "AI Rulebook",
   "description": "AI Rulebook — install and manage focused, always-on engineering rules in AGENTS.md (with a CLAUDE.md import for Claude Code), shared by Cursor, Cline, opencode, Windsurf, GitHub Copilot, and Claude Code.",
-  "version": "4.1.0",
+  "version": "4.2.0",
   "publisher": "WyvernSystemsLLC",
   "license": "MIT",
   "icon": "icon.png",
